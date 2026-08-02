@@ -1,0 +1,102 @@
+@import "tailwindcss";
+
+:root {
+  --color-periwinkle: #bfc9eb;
+  --color-indigo: #4c4993;
+  --color-cream: #f4f5f1;
+  --color-mint: #a1cdc4;
+}
+
+@layer base {
+  body {
+    font-family: 'Plus Jakarta Sans', 'Noto Sans TC', -apple-system, BlinkMacSystemFont, sans-serif;
+    background: linear-gradient(135deg, #eef1f8 0%, #bfc9eb 50%, #e2e8f5 100%);
+    background-attachment: fixed;
+    color: #4c4993;
+  }
+}
+
+/* Custom Scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: rgba(191, 201, 235, 0.4);
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(76, 73, 147, 0.4);
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(76, 73, 147, 0.7);
+}
+
+/* Noguchi Blue Palette Glassmorphism */
+.glass-panel {
+  background: rgba(244, 245, 241, 0.92);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(191, 201, 235, 0.6);
+  box-shadow: 0 8px 30px -4px rgba(76, 73, 147, 0.08);
+}
+
+.glass-card {
+  background: rgba(244, 245, 241, 0.96);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(191, 201, 235, 0.5);
+  box-shadow: 0 4px 16px -2px rgba(76, 73, 147, 0.06);
+}
+
+.glass-card:hover {
+  border-color: rgba(76, 73, 147, 0.5);
+  box-shadow: 0 12px 32px -4px rgba(76, 73, 147, 0.18);
+}
+
+.gradient-text-noguchi {
+  background: linear-gradient(135deg, #4c4993 0%, #635fa8 50%, #1f1b63 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.btn-noguchi-primary {
+  background: linear-gradient(135deg, #4c4993 0%, #5d59a8 100%);
+  color: #ffffff;
+  box-shadow: 0 4px 14px rgba(76, 73, 147, 0.25);
+}
+
+.btn-noguchi-primary:hover {
+  background: linear-gradient(135deg, #3d3a7c 0%, #4c4993 100%);
+}
+
+.badge-mint {
+  background-color: rgba(161, 205, 196, 0.35);
+  color: #2b564e;
+  border: 1px solid rgba(161, 205, 196, 0.8);
+}
+
+.badge-periwinkle {
+  background-color: rgba(191, 201, 235, 0.4);
+  color: #383570;
+  border: 1px solid rgba(191, 201, 235, 0.8);
+}
+
+/* Animations */
+@keyframes slideUp {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+
+.animate-slide-up {
+  animation: slideUp 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.2s ease-out forwards;
+}

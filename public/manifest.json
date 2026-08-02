@@ -1,0 +1,17 @@
+{
+  "name": "CollectTrack 二次元專欄展示與留言記帳系統",
+  "short_name": "宣圖專欄",
+  "description": "二次元週邊專欄展示 × 隨手留言記帳資產管理 (支援 100% 離線運作)",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#bfc9eb",
+  "theme_color": "#4c4993",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

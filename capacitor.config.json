@@ -1,0 +1,8 @@
+{
+  "appId": "com.collecttrack.showcase",
+  "appName": "CollectTrack 宣圖專欄",
+  "webDir": "dist",
+  "server": {
+    "androidScheme": "https"
+  }
+}
