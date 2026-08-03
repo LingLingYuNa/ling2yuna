@@ -36,7 +36,7 @@ export default function ColumnDetailView() {
 
   return (
     <div className="space-y-4 sm:space-y-5 animate-fade-in pb-12">
-      {/* 頂部導航與動作按鈕 (2R 俐落微圓角 rounded-lg) */}
+      {/* 頂部導航與動作按鈕 */}
       <div className="flex items-center justify-between">
         <button
           onClick={() => setSelectedColumnId(null)}
@@ -83,7 +83,7 @@ export default function ColumnDetailView() {
         </div>
       </div>
 
-      {/* ⭐ 專欄 Hero 標題區 (2R 俐落微圓角 rounded-lg) ⭐ */}
+      {/* 專欄 Hero 標題區 (2R 俐落微圓角 rounded-lg) */}
       <div className="relative rounded-lg overflow-hidden border border-[#4c4993]/30 bg-[#1f1b63] shadow-md transition-all duration-200">
         {/* 折疊狀態 (Micro Bar) */}
         {isHeaderCollapsed ? (
@@ -148,7 +148,7 @@ export default function ColumnDetailView() {
                 </p>
               </div>
 
-              {/* 右下角總花費與收合按鈕 (2R 導角) */}
+              {/* 右下角總花費與收合按鈕 */}
               <div className="flex flex-col items-end gap-2 shrink-0">
                 <div className="bg-[#f4f5f1] border border-white/40 p-3 rounded-lg text-[#161348] shadow-md w-full sm:w-auto">
                   <div className="text-[10px] font-extrabold uppercase tracking-wider text-[#4c4993] flex items-center gap-1 mb-0.5">
@@ -200,7 +200,7 @@ export default function ColumnDetailView() {
             </button>
           </div>
 
-          {/* ⭐ 手機版與電腦版皆採用 2R 微圓角 (rounded-lg) 雙欄瀑布流排版！ ⭐ */}
+          {/* ⭐ 展圖藝廊：改用 Row-First CSS Grid (grid-cols-2 lg:grid-cols-3)，確保照片閱讀順序為左 1、右 2、下左 3、下右 4！ ⭐ */}
           {columnImages.length === 0 ? (
             <div className="bg-[#f4f5f1] rounded-lg p-8 text-center border border-dashed border-[#4c4993]/40">
               <ImageIcon className="w-10 h-10 text-[#4c4993]/50 mx-auto mb-2" />
@@ -208,12 +208,12 @@ export default function ColumnDetailView() {
               <p className="text-[11px] text-[#4c4993]/70 font-semibold mt-1">點擊上方「新增美圖」批量上傳宣圖或插畫照片</p>
             </div>
           ) : (
-            <div className="columns-2 sm:columns-2 lg:columns-3 gap-3 sm:gap-4 space-y-3 sm:space-y-4">
+            <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 items-start">
               {columnImages.map((img) => (
                 <div
                   key={img.id}
                   onClick={() => setLightboxImage(img)}
-                  className="break-inside-avoid group relative rounded-lg overflow-hidden border border-[#4c4993]/30 bg-white cursor-pointer hover:border-[#4c4993] transition shadow-xs hover:shadow-md mb-3 sm:mb-4"
+                  className="group relative rounded-lg overflow-hidden border border-[#4c4993]/30 bg-white cursor-pointer hover:border-[#4c4993] transition shadow-xs hover:shadow-md"
                 >
                   <img
                     src={img.url}
