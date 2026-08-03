@@ -11,14 +11,13 @@ export default function ColumnsView() {
   // 專欄時間與花費排序模式
   const [sortBy, setSortBy] = useState('newest');
 
-  // ⭐ 自動恢復回到上一頁時的滾動位置 (Scroll Position Restoration) ⭐
+  // 自動恢復回到上一頁時的滾動位置
   useLayoutEffect(() => {
     if (!selectedColumnId) {
       const savedPos = sessionStorage.getItem('collecttrack_scroll_pos');
       if (savedPos !== null) {
         const top = parseInt(savedPos, 10);
         if (!isNaN(top)) {
-          // 使用 setTimeout 確保 DOM 渲染完畢後精確滾動定位
           setTimeout(() => {
             window.scrollTo({ top, behavior: 'instant' });
           }, 0);
@@ -51,7 +50,7 @@ export default function ColumnsView() {
 
   return (
     <div className="space-y-5 animate-fade-in pb-12">
-      {/* 標題與簡介區 - 2R 俐落微圓角 (rounded-lg) */}
+      {/* 標題與簡介區 */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-gradient-to-r from-[#f4f5f1] via-[#e8ebf7] to-[#d6dedf] p-5 rounded-lg border border-[#bfc9eb] shadow-xs">
         <div>
           <div className="flex items-center space-x-2 mb-1">
@@ -65,9 +64,8 @@ export default function ColumnsView() {
           </p>
         </div>
 
-        {/* 動作按鈕區: 時間排序 + Excel 匯入 + 建立專欄 */}
+        {/* 動作按鈕區 */}
         <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
-          {/* 時間與花費動態排序切換選單 */}
           <div className="relative inline-flex items-center bg-[#f4f5f1] border border-[#4c4993]/30 rounded-lg px-2.5 py-1.5 shadow-xs">
             <ArrowUpDown className="w-3.5 h-3.5 text-[#4c4993] mr-1.5 shrink-0" />
             <span className="text-[11px] font-black text-[#4c4993] mr-1 hidden sm:inline">排序:</span>
@@ -105,7 +103,7 @@ export default function ColumnsView() {
         </div>
       </div>
 
-      {/* 專欄列表網格：Row-First CSS Grid (grid-cols-2 lg:grid-cols-3) */}
+      {/* ⭐ 經典 Pinterest 瀑布流 (columns-2 sm:columns-2 lg:columns-3)，保持圖片原有比例！ ⭐ */}
       {sortedColumns.length === 0 ? (
         <div className="bg-[#f4f5f1] rounded-lg p-10 text-center border-2 border-dashed border-[#bfc9eb] shadow-xs">
           <div className="w-12 h-12 bg-[#a1cdc4]/30 rounded-lg flex items-center justify-center mx-auto mb-3 border border-[#a1cdc4]">
@@ -136,15 +134,15 @@ export default function ColumnsView() {
           </div>
         </div>
       ) : (
-        <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-5 items-start">
+        <div className="columns-2 sm:columns-2 lg:columns-3 gap-3 sm:gap-5 space-y-3 sm:space-y-5">
           {sortedColumns.map((col) => (
             <div
               key={col.id}
               onClick={() => setSelectedColumnId(col.id)}
-              className="group glass-card rounded-lg overflow-hidden cursor-pointer transition-all duration-200 hover:-translate-y-0.5 flex flex-col justify-between h-full"
+              className="break-inside-avoid group glass-card rounded-lg overflow-hidden cursor-pointer transition-all duration-200 hover:-translate-y-0.5 flex flex-col justify-between mb-3 sm:mb-5"
             >
               <div>
-                {/* 封面圖 */}
+                {/* 封面圖 (保留原圖尺寸比例) */}
                 <div className="w-full relative overflow-hidden bg-[#e8ebf7] min-h-[110px] flex items-center justify-center">
                   {col.coverImage ? (
                     <img
@@ -197,7 +195,7 @@ export default function ColumnsView() {
               </div>
 
               {/* 底部指引 */}
-              <div className="px-3 py-2 border-t border-[#bfc9eb]/60 bg-[#f4f5f1] flex items-center justify-between text-[10px] sm:text-xs text-[#4c4993] mt-auto">
+              <div className="px-3 py-2 border-t border-[#bfc9eb]/60 bg-[#f4f5f1] flex items-center justify-between text-[10px] sm:text-xs text-[#4c4993]">
                 <div className="flex items-center gap-1 text-[#4c4993]/80 font-mono font-bold">
                   <Clock className="w-3 h-3 text-[#4c4993]" />
                   <span>{new Date(col.createdAt || Date.now()).toLocaleDateString()}</span>

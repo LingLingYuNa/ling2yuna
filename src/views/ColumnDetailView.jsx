@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import CommentLedger from '../components/CommentLedger';
-import { ArrowLeft, Plus, Image as ImageIcon, Edit3, Trash2, Maximize2, Calculator, ChevronUp, ChevronDown, CheckSquare, Square, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, Plus, Image as ImageIcon, Edit3, Trash2, Maximize2, Calculator, ChevronUp, ChevronDown, CheckSquare, Square } from 'lucide-react';
 
 export default function ColumnDetailView() {
   const {
@@ -23,7 +23,7 @@ export default function ColumnDetailView() {
   // 專欄最上方的專欄介紹摺疊狀態 (預設摺疊收合)
   const [isHeaderCollapsed, setIsHeaderCollapsed] = useState(true);
 
-  // ⭐ 展圖批次選擇刪除模式 ⭐
+  // 展圖批次選擇刪除模式
   const [isSelectMode, setIsSelectMode] = useState(false);
   const [selectedImageIds, setSelectedImageIds] = useState([]);
 
@@ -40,14 +40,12 @@ export default function ColumnDetailView() {
     setIsColumnModalOpen(true);
   };
 
-  // 切換單張圖片勾選狀態
   const toggleImageSelect = (id) => {
     setSelectedImageIds((prev) =>
       prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
     );
   };
 
-  // 全選或取消全選
   const toggleSelectAll = () => {
     if (selectedImageIds.length === columnImages.length) {
       setSelectedImageIds([]);
@@ -56,7 +54,6 @@ export default function ColumnDetailView() {
     }
   };
 
-  // 執行批次勾選刪除
   const executeBatchDelete = async () => {
     if (selectedImageIds.length === 0) return;
     await handleDeleteImagesBatch(selectedImageIds);
@@ -77,7 +74,6 @@ export default function ColumnDetailView() {
         </button>
 
         <div className="flex items-center space-x-2">
-          {/* 折疊/展開專欄介紹切換按鈕 */}
           <button
             onClick={() => setIsHeaderCollapsed(!isHeaderCollapsed)}
             className="inline-flex items-center gap-1 text-[#4c4993] text-xs font-extrabold bg-[#f4f5f1] hover:bg-white px-3 py-1.5 rounded-lg border border-[#4c4993]/30 transition cursor-pointer shadow-xs"
@@ -113,9 +109,8 @@ export default function ColumnDetailView() {
         </div>
       </div>
 
-      {/* 專欄 Hero 標題區 (2R 俐落微圓角 rounded-lg) */}
+      {/* 專欄 Hero 標題區 */}
       <div className="relative rounded-lg overflow-hidden border border-[#4c4993]/30 bg-[#1f1b63] shadow-md transition-all duration-200">
-        {/* 折疊狀態 */}
         {isHeaderCollapsed ? (
           <div
             onClick={() => setIsHeaderCollapsed(false)}
@@ -141,7 +136,6 @@ export default function ColumnDetailView() {
             </div>
           </div>
         ) : (
-          /* 展開狀態 */
           <div>
             {currentColumn.coverImage ? (
               <div className="w-full relative overflow-hidden flex items-center justify-center bg-[#161348]">
@@ -178,7 +172,6 @@ export default function ColumnDetailView() {
                 </p>
               </div>
 
-              {/* 右下角總花費與收合按鈕 */}
               <div className="flex flex-col items-end gap-2 shrink-0">
                 <div className="bg-[#f4f5f1] border border-white/40 p-3 rounded-lg text-[#161348] shadow-md w-full sm:w-auto">
                   <div className="text-[10px] font-extrabold uppercase tracking-wider text-[#4c4993] flex items-center gap-1 mb-0.5">
@@ -206,15 +199,15 @@ export default function ColumnDetailView() {
         )}
       </div>
 
-      {/* 響應式佈局：手機版留言在上方，電腦版留言在展圖右邊 */}
+      {/* 響應式佈局 */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-5 items-start">
         
-        {/* 區塊 1：留言記帳與金額總計區 (手機版: 在上方 / 電腦版: 在右側 lg:col-span-5 lg:order-2) */}
+        {/* 區塊 1：留言記帳與金額總計區 */}
         <div className="lg:col-span-5 lg:order-2 w-full">
           <CommentLedger />
         </div>
 
-        {/* 區塊 2：專欄展圖藝廊 (手機版: 在下方 / 電腦版: 在左側 lg:col-span-7 lg:order-1) */}
+        {/* 區塊 2：專欄展圖藝廊 (使用經典 Pinterest 真瀑布流 columns-2 sm:columns-2 lg:columns-3 保留圖片原有比例) */}
         <div className="lg:col-span-7 lg:order-1 w-full space-y-3 sm:space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <h2 className="font-black text-base text-[#4c4993] flex items-center gap-2">
@@ -222,7 +215,6 @@ export default function ColumnDetailView() {
               專欄展圖藝廊 ({columnImages.length} 張)
             </h2>
 
-            {/* ⭐ 一鍵刪除展圖 & 批次選擇刪除工具列 ⭐ */}
             <div className="flex items-center space-x-2">
               {columnImages.length > 0 && (
                 <>
@@ -285,7 +277,7 @@ export default function ColumnDetailView() {
             </div>
           </div>
 
-          {/* 展圖藝廊：Row-First CSS Grid (grid-cols-2 lg:grid-cols-3)，支援勾選模式 */}
+          {/* ⭐ 經典 Pinterest 瀑布流展示 (columns-2 sm:columns-2 lg:columns-3)，完美保留照片原有的長寬比例！ ⭐ */}
           {columnImages.length === 0 ? (
             <div className="bg-[#f4f5f1] rounded-lg p-8 text-center border border-dashed border-[#4c4993]/40">
               <ImageIcon className="w-10 h-10 text-[#4c4993]/50 mx-auto mb-2" />
@@ -293,7 +285,7 @@ export default function ColumnDetailView() {
               <p className="text-[11px] text-[#4c4993]/70 font-semibold mt-1">點擊上方「新增美圖」批量上傳宣圖或插畫照片</p>
             </div>
           ) : (
-            <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 items-start">
+            <div className="columns-2 sm:columns-2 lg:columns-3 gap-3 sm:gap-4 space-y-3 sm:space-y-4">
               {columnImages.map((img) => {
                 const isSelected = selectedImageIds.includes(img.id);
 
@@ -307,19 +299,19 @@ export default function ColumnDetailView() {
                         setLightboxImage(img);
                       }
                     }}
-                    className={`group relative rounded-lg overflow-hidden border transition shadow-xs hover:shadow-md cursor-pointer ${
+                    className={`break-inside-avoid group relative rounded-lg overflow-hidden border transition shadow-xs hover:shadow-md cursor-pointer mb-3 sm:mb-4 ${
                       isSelectMode && isSelected
                         ? 'border-red-600 ring-2 ring-red-400 bg-red-50'
                         : 'border-[#4c4993]/30 bg-white hover:border-[#4c4993]'
                     }`}
                   >
+                    {/* 100% 自然原圖長寬比例，絕不硬性裁切 */}
                     <img
                       src={img.url}
                       alt={img.caption || '專欄展圖'}
                       className="w-full h-auto block object-contain rounded-lg group-hover:scale-[1.02] transition duration-300"
                     />
 
-                    {/* 批次選取模式下的 Checkbox 勾選層 */}
                     {isSelectMode ? (
                       <div className="absolute top-2 right-2 z-20">
                         {isSelected ? (
@@ -333,7 +325,6 @@ export default function ColumnDetailView() {
                         )}
                       </div>
                     ) : (
-                      /* 一般模式下 hover 出現的放大圖示 */
                       <div className="absolute inset-0 bg-gradient-to-t from-[#161348]/90 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition p-2.5 flex flex-col justify-between">
                         <div className="self-end">
                           <span className="p-1.5 bg-[#f4f5f1] rounded-md text-[#161348] font-bold inline-block shadow-xs">
