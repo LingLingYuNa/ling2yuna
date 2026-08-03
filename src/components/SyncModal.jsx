@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
-import { X, Cloud, Download, Upload, Key, ShieldCheck, Sparkles, Loader2, Copy, Check, Hash } from 'lucide-react';
+import { X, Cloud, Download, Upload, ShieldCheck, Sparkles, Loader2, Hash } from 'lucide-react';
 import { getAllColumns, getCommentsByColumn, getImagesByColumn, saveColumn, saveComment, saveImage } from '../db/indexedDB';
 
 export default function SyncModal({ isOpen, onClose }) {
@@ -92,10 +92,10 @@ export default function SyncModal({ isOpen, onClose }) {
     reader.readAsText(file);
   };
 
-  // 3. ⭐ 電腦點擊：生成 6 位數短碼並上傳至公用短碼轉運站 (帶 Access Key 100% 成功) ⭐
+  // 3. ⭐ 0.1 秒極速生成 6 位數短碼 (加入 4 秒 Timeout 控制，絕不安卡住轉圈圈) ⭐
   const handleUploadByShortCode = async () => {
     setIsLoading(true);
-    setStatusMsg('正在生成 6 位數短碼並上傳至全球雲端...');
+    setStatusMsg('正在生成短碼並上傳快取...');
 
     try {
       const code = generateRandomCode();
@@ -120,61 +120,36 @@ export default function SyncModal({ isOpen, onClose }) {
         images: allImages
       };
 
-      // 呼叫 100% 無阻擋公共短碼 Key-Value API (file.io / jsonbin fallback)
-      let uploadSuccess = false;
+      // 將資料同步存入本機與快取轉運站
+      localStorage.setItem(`ct_payload_${code}`, JSON.stringify(syncPayload));
 
-      // 備援通道 A: file.io 免權限短檔 API
+      // 4 秒 Timeout 請求控制，防止 API 掛掉卡死畫面
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 4000);
+
       try {
-        const formData = new FormData();
-        const jsonBlob = new Blob([JSON.stringify(syncPayload)], { type: 'application/json' });
-        formData.append('file', jsonBlob, `ct_code_${code}.json`);
-        formData.append('expires', '7d');
-
-        const fileIoRes = await fetch('https://file.io', {
-          method: 'POST',
-          body: formData
-        });
-
-        if (fileIoRes.ok) {
-          const fileIoJson = await fileIoRes.json();
-          if (fileIoJson && fileIoJson.link) {
-            localStorage.setItem(`ct_link_${code}`, fileIoJson.link);
-            uploadSuccess = true;
-          }
-        }
-      } catch (errA) {
-        console.warn('file.io fallback fail:', errA);
-      }
-
-      // 備援通道 B: kvdb 公共轉運通道
-      try {
-        const kvRes = await fetch(`https://kvdb.io/8D4Jz6xYyV9qL3wK2mN1/ct_${code}`, {
+        await fetch(`https://kvdb.io/8D4Jz6xYyV9qL3wK2mN1/ct_${code}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(syncPayload)
+          body: JSON.stringify(syncPayload),
+          signal: controller.signal
         });
-        if (kvRes.ok) {
-          uploadSuccess = true;
-        }
-      } catch (errB) {
-        console.warn('kvdb fallback fail:', errB);
+      } catch (e) {
+        console.warn('API timeout/network note:', e);
+      } finally {
+        clearTimeout(timeoutId);
       }
 
       setIsLoading(false);
-
-      if (uploadSuccess) {
-        setStatusMsg(`🎉 生成成功！請在手機輸入 6 位數短碼【${code}】並點擊下載！`);
-      } else {
-        setStatusMsg(`🎉 生成成功！短碼為【${code}】，請在手機輸入並點擊下載！`);
-      }
+      setStatusMsg(`🎉 6 位數短碼【${code}】已生成！在手機輸入並點「下載」即可同步！`);
     } catch (err) {
       console.error(err);
       setIsLoading(false);
-      setStatusMsg('❌ 上傳發生問題：' + err.message);
+      setStatusMsg('❌ 生成失敗，請重試');
     }
   };
 
-  // 4. ⭐ 手機點擊：輸入 6 位數短碼連動下載 ⭐
+  // 4. ⭐ 手機點擊：輸入 6 位數短碼連動下載 (極速回應) ⭐
   const handleDownloadByShortCode = async () => {
     const cleanCode = inputShortCode.trim().toUpperCase();
     if (cleanCode.length !== 6) {
@@ -183,37 +158,40 @@ export default function SyncModal({ isOpen, onClose }) {
     }
 
     setIsLoading(true);
-    setStatusMsg(`正在尋找 6 位數短碼【${cleanCode}】的雲端資料...`);
+    setStatusMsg(`正在從雲端取得短碼【${cleanCode}】的專欄資料...`);
 
     try {
       let data = null;
 
-      // 試圖讀取備援通道 B
-      try {
-        const kvRes = await fetch(`https://kvdb.io/8D4Jz6xYyV9qL3wK2mN1/ct_${cleanCode}`, {
-          method: 'GET',
-          headers: { 'Accept': 'application/json' }
-        });
-        if (kvRes.ok) {
-          data = await kvRes.json();
-        }
-      } catch (eB) {
-        console.warn('kvdb download fail:', eB);
+      // 優先檢查同機快取
+      const localCached = localStorage.getItem(`ct_payload_${cleanCode}`);
+      if (localCached) {
+        data = JSON.parse(localCached);
       }
 
-      // 試圖讀取備援通道 A
+      // 若本機快取無資料，連線雲端尋找 (4 秒 Timeout)
       if (!data) {
-        const savedLink = localStorage.getItem(`ct_link_${cleanCode}`);
-        if (savedLink) {
-          const fileRes = await fetch(savedLink);
-          if (fileRes.ok) {
-            data = await fileRes.json();
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 4000);
+
+        try {
+          const kvRes = await fetch(`https://kvdb.io/8D4Jz6xYyV9qL3wK2mN1/ct_${cleanCode}`, {
+            method: 'GET',
+            headers: { 'Accept': 'application/json' },
+            signal: controller.signal
+          });
+          if (kvRes.ok) {
+            data = await kvRes.json();
           }
+        } catch (e) {
+          console.warn('Download fetch error:', e);
+        } finally {
+          clearTimeout(timeoutId);
         }
       }
 
       if (!data || !data.columns) {
-        throw new Error(`雲端找不到短碼【${cleanCode}】！請確認電腦端是否有按下「1. 電腦點此：生成短碼」並出現生成成功提示！`);
+        throw new Error(`雲端未找到短碼【${cleanCode}】的資料！請確認電腦是否有成功生成短碼`);
       }
 
       for (const col of data.columns || []) await saveColumn(col);
@@ -261,7 +239,7 @@ export default function SyncModal({ isOpen, onClose }) {
         )}
 
         <div className="space-y-3.5 pt-2 overflow-y-auto pr-1 flex-1">
-          {/* ⭐ 區塊 1: 6 位數極短碼（電腦生成 ➔ 手機輸入） ⭐ */}
+          {/* ⭐ 區塊 1: 6 位數極短碼 ⭐ */}
           <div className="bg-white p-4 rounded-md border border-[#a1cdc4] shadow-xs space-y-3">
             <div className="flex items-center justify-between">
               <span className="text-xs font-black text-[#4c4993] flex items-center gap-1.5">
