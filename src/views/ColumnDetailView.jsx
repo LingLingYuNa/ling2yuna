@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useApp } from '../context/AppContext';
 import CommentLedger from '../components/CommentLedger';
 import { ArrowLeft, Plus, Image as ImageIcon, Edit3, Trash2, Maximize2, Calculator, ChevronUp, ChevronDown, CheckSquare, Square } from 'lucide-react';
@@ -26,6 +26,18 @@ export default function ColumnDetailView() {
   // 展圖批次選擇刪除模式
   const [isSelectMode, setIsSelectMode] = useState(false);
   const [selectedImageIds, setSelectedImageIds] = useState([]);
+
+  // ⭐ Pinterest 雙欄【左一、右二】真瀑布流 (True Masonry) 分拆 ⭐
+  // 左欄收納：Index 0, 2, 4, 6... (左一、下左三、下左五...)
+  // 右欄收納：Index 1, 3, 5, 7... (右二、下右四、下右六...)
+  const leftColumnImages = useMemo(
+    () => columnImages.filter((_, idx) => idx % 2 === 0),
+    [columnImages]
+  );
+  const rightColumnImages = useMemo(
+    () => columnImages.filter((_, idx) => idx % 2 === 1),
+    [columnImages]
+  );
 
   if (!currentColumn) {
     return (
@@ -59,6 +71,63 @@ export default function ColumnDetailView() {
     await handleDeleteImagesBatch(selectedImageIds);
     setSelectedImageIds([]);
     setIsSelectMode(false);
+  };
+
+  // 單張照片卡片渲染子組件
+  const renderImageCard = (img) => {
+    const isSelected = selectedImageIds.includes(img.id);
+
+    return (
+      <div
+        key={img.id}
+        onClick={() => {
+          if (isSelectMode) {
+            toggleImageSelect(img.id);
+          } else {
+            setLightboxImage(img);
+          }
+        }}
+        className={`group relative rounded-lg overflow-hidden border transition shadow-xs hover:shadow-md cursor-pointer w-full ${
+          isSelectMode && isSelected
+            ? 'border-red-600 ring-2 ring-red-400 bg-red-50'
+            : 'border-[#4c4993]/30 bg-white hover:border-[#4c4993]'
+        }`}
+      >
+        {/* 100% 保持圖片原有長寬比例，絕不裁切拉伸 */}
+        <img
+          src={img.url}
+          alt={img.caption || '專欄展圖'}
+          className="w-full h-auto block object-contain rounded-lg group-hover:scale-[1.02] transition duration-300"
+        />
+
+        {isSelectMode ? (
+          <div className="absolute top-2 right-2 z-20">
+            {isSelected ? (
+              <div className="p-1 bg-red-600 text-white rounded-md shadow-md">
+                <CheckSquare className="w-4 h-4" />
+              </div>
+            ) : (
+              <div className="p-1 bg-black/40 text-white/80 rounded-md shadow-md">
+                <Square className="w-4 h-4" />
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="absolute inset-0 bg-gradient-to-t from-[#161348]/90 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition p-2.5 flex flex-col justify-between">
+            <div className="self-end">
+              <span className="p-1.5 bg-[#f4f5f1] rounded-md text-[#161348] font-bold inline-block shadow-xs">
+                <Maximize2 className="w-3.5 h-3.5" />
+              </span>
+            </div>
+            <div>
+              <p className="text-white font-bold text-[10px] sm:text-xs line-clamp-2">
+                {img.caption || '點擊放大全螢幕檢視'}
+              </p>
+            </div>
+          </div>
+        )}
+      </div>
+    );
   };
 
   return (
@@ -207,7 +276,7 @@ export default function ColumnDetailView() {
           <CommentLedger />
         </div>
 
-        {/* 區塊 2：專欄展圖藝廊 (使用嚴格左一右二 CSS Grid grid-cols-2 lg:grid-cols-3) */}
+        {/* 區塊 2：專欄展圖藝廊 (Pinterest 雙欄【左一、右二】真實原圖比例 True Masonry 瀑布流) */}
         <div className="lg:col-span-7 lg:order-1 w-full space-y-3 sm:space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <h2 className="font-black text-base text-[#4c4993] flex items-center gap-2">
@@ -277,7 +346,7 @@ export default function ColumnDetailView() {
             </div>
           </div>
 
-          {/* ⭐ 嚴格左一右二 Row-First CSS Grid (grid-cols-2 lg:grid-cols-3) ⭐ */}
+          {/* ⭐ 經典 Pinterest 雙欄【左一、右二】真實原圖比例瀑布流 (True Masonry) ⭐ */}
           {columnImages.length === 0 ? (
             <div className="bg-[#f4f5f1] rounded-lg p-8 text-center border border-dashed border-[#4c4993]/40">
               <ImageIcon className="w-10 h-10 text-[#4c4993]/50 mx-auto mb-2" />
@@ -285,62 +354,16 @@ export default function ColumnDetailView() {
               <p className="text-[11px] text-[#4c4993]/70 font-semibold mt-1">點擊上方「新增美圖」批量上傳宣圖或插畫照片</p>
             </div>
           ) : (
-            <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 items-start">
-              {columnImages.map((img) => {
-                const isSelected = selectedImageIds.includes(img.id);
+            <div className="flex gap-3 sm:gap-4 items-start w-full">
+              {/* 左欄：第 1, 3, 5, 7... 張照片 */}
+              <div className="flex-1 flex flex-col gap-3 sm:gap-4 min-w-0">
+                {leftColumnImages.map((img) => renderImageCard(img))}
+              </div>
 
-                return (
-                  <div
-                    key={img.id}
-                    onClick={() => {
-                      if (isSelectMode) {
-                        toggleImageSelect(img.id);
-                      } else {
-                        setLightboxImage(img);
-                      }
-                    }}
-                    className={`group relative rounded-lg overflow-hidden border transition shadow-xs hover:shadow-md cursor-pointer ${
-                      isSelectMode && isSelected
-                        ? 'border-red-600 ring-2 ring-red-400 bg-red-50'
-                        : 'border-[#4c4993]/30 bg-white hover:border-[#4c4993]'
-                    }`}
-                  >
-                    {/* 保留原圖比例 */}
-                    <img
-                      src={img.url}
-                      alt={img.caption || '專欄展圖'}
-                      className="w-full h-auto block object-contain rounded-lg group-hover:scale-[1.02] transition duration-300"
-                    />
-
-                    {isSelectMode ? (
-                      <div className="absolute top-2 right-2 z-20">
-                        {isSelected ? (
-                          <div className="p-1 bg-red-600 text-white rounded-md shadow-md">
-                            <CheckSquare className="w-4 h-4" />
-                          </div>
-                        ) : (
-                          <div className="p-1 bg-black/40 text-white/80 rounded-md shadow-md">
-                            <Square className="w-4 h-4" />
-                          </div>
-                        )}
-                      </div>
-                    ) : (
-                      <div className="absolute inset-0 bg-gradient-to-t from-[#161348]/90 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition p-2.5 flex flex-col justify-between">
-                        <div className="self-end">
-                          <span className="p-1.5 bg-[#f4f5f1] rounded-md text-[#161348] font-bold inline-block shadow-xs">
-                            <Maximize2 className="w-3.5 h-3.5" />
-                          </span>
-                        </div>
-                        <div>
-                          <p className="text-white font-bold text-[10px] sm:text-xs line-clamp-2">
-                            {img.caption || '點擊放大全螢幕檢視'}
-                          </p>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
+              {/* 右欄：第 2, 4, 6, 8... 張照片 */}
+              <div className="flex-1 flex flex-col gap-3 sm:gap-4 min-w-0">
+                {rightColumnImages.map((img) => renderImageCard(img))}
+              </div>
             </div>
           )}
         </div>
