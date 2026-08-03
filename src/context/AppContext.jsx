@@ -20,6 +20,9 @@ const AppContext = createContext();
 export function AppProvider({ children }) {
   const [columns, setColumns] = useState([]);
   
+  // 雙擊退出提示 Toast
+  const [exitToastVisible, setExitToastVisible] = useState(false);
+
   // 網頁狀態持久化
   const [selectedColumnId, setSelectedColumnIdState] = useState(() => {
     const hash = window.location.hash;
@@ -30,18 +33,61 @@ export function AppProvider({ children }) {
     return savedId === 'HOME' ? null : savedId || null;
   });
 
-  // 包裝 setSelectedColumnId，在離開總覽頁時自動紀錄當前的滾動高度 scrollY
+  // 包裝 setSelectedColumnId，在切換頁面時同步 Push History State
   const setSelectedColumnId = (id) => {
     if (id) {
       sessionStorage.setItem('collecttrack_scroll_pos', window.scrollY.toString());
       localStorage.setItem('collecttrack_selected_column_id', id);
-      window.history.replaceState(null, '', `#column/${id}`);
+      window.history.pushState({ page: 'detail', id }, '', `#column/${id}`);
     } else {
       localStorage.setItem('collecttrack_selected_column_id', 'HOME');
-      window.history.replaceState(null, '', window.location.pathname);
+      window.history.pushState({ page: 'home' }, '', window.location.pathname);
     }
     setSelectedColumnIdState(id);
   };
+
+  // ⭐ 處理手機返回鍵 (Popstate & 雙擊返回鍵退出保護) ⭐
+  useEffect(() => {
+    let lastBackPressTime = 0;
+    let toastTimer = null;
+
+    // 初次載入歷史壓入
+    if (!window.history.state) {
+      window.history.replaceState({ page: selectedColumnId ? 'detail' : 'home' }, '');
+    }
+
+    const handlePopState = (event) => {
+      // 情況 A：人在專欄詳細頁時，按手機返回鍵 ➔ 返回專欄總覽牆
+      if (selectedColumnId) {
+        setSelectedColumnIdState(null);
+        localStorage.setItem('collecttrack_selected_column_id', 'HOME');
+        return;
+      }
+
+      // 情況 B：人在專欄總覽牆時 ➔ 連按兩次返回鍵才能退出 App
+      const now = Date.now();
+      if (now - lastBackPressTime < 2000) {
+        // 2 秒內按了第二次：允許退出
+        window.history.back();
+      } else {
+        lastBackPressTime = now;
+        setExitToastVisible(true);
+        if (toastTimer) clearTimeout(toastTimer);
+        toastTimer = setTimeout(() => {
+          setExitToastVisible(false);
+        }, 2000);
+
+        // 壓入防護 State，避免單次按下即關閉網頁
+        window.history.pushState({ page: 'home' }, '', window.location.pathname);
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+      if (toastTimer) clearTimeout(toastTimer);
+    };
+  }, [selectedColumnId]);
 
   // 當前選取專欄的子資料
   const [columnComments, setColumnComments] = useState([]);
@@ -60,7 +106,7 @@ export function AppProvider({ children }) {
       setColumns(data);
 
       if (selectedColumnId && !data.some(c => c.id === selectedColumnId)) {
-        setSelectedColumnId(null);
+        setSelectedColumnIdState(null);
       }
     } catch (err) {
       console.error('Failed to load columns:', err);
@@ -154,7 +200,7 @@ export function AppProvider({ children }) {
     setColumnImages([]);
   };
 
-  // 新增留言記帳 (自動觸發 updatedAt)
+  // 新增留言記帳
   const handleAddComment = async (text, author = 'LingLing_YuNa') => {
     if (!text || !text.trim() || !selectedColumnId) return;
     const parsed = parseLedgerComment(text);
@@ -173,7 +219,7 @@ export function AppProvider({ children }) {
     await touchColumnUpdatedAt(selectedColumnId);
   };
 
-  // 編輯更新留言記帳 (自動觸發 updatedAt)
+  // 編輯更新留言記帳
   const handleUpdateComment = async (id, newText) => {
     if (!newText || !newText.trim()) return;
     const existing = columnComments.find(c => c.id === id);
@@ -192,14 +238,14 @@ export function AppProvider({ children }) {
     await touchColumnUpdatedAt(selectedColumnId);
   };
 
-  // 刪除留言記帳 (自動觸發 updatedAt)
+  // 刪除留言記帳
   const handleDeleteComment = async (id) => {
     await dbDeleteComment(id);
     setColumnComments(prev => prev.filter(c => c.id !== id));
     if (selectedColumnId) await touchColumnUpdatedAt(selectedColumnId);
   };
 
-  // 單張新增照片 (自動觸發 updatedAt)
+  // 單張新增照片
   const handleAddImage = async (url, caption) => {
     if (!url || !selectedColumnId) return;
     const newImg = {
@@ -215,7 +261,7 @@ export function AppProvider({ children }) {
     await touchColumnUpdatedAt(selectedColumnId);
   };
 
-  // 批量新增照片 (自動觸發 updatedAt)
+  // 批量新增照片
   const handleAddImagesBatch = async (imagesList) => {
     if (!imagesList || imagesList.length === 0 || !selectedColumnId) return;
     
@@ -240,7 +286,7 @@ export function AppProvider({ children }) {
     await touchColumnUpdatedAt(selectedColumnId);
   };
 
-  // 單張刪除照片 (自動觸發 updatedAt)
+  // 單張刪除照片
   const handleDeleteImage = async (id) => {
     if (!window.confirm('確定要刪除這張展圖嗎？')) return;
     await dbDeleteImage(id);
@@ -249,7 +295,7 @@ export function AppProvider({ children }) {
     if (selectedColumnId) await touchColumnUpdatedAt(selectedColumnId);
   };
 
-  // 批次一鍵刪除選取的照片 (自動觸發 updatedAt)
+  // 批次一鍵刪除選取的照片
   const handleDeleteImagesBatch = async (ids) => {
     if (!ids || ids.length === 0) return;
     if (!window.confirm(`確定要一次刪除已選取的 ${ids.length} 張展圖嗎？此動作無法復原！`)) return;
@@ -259,7 +305,7 @@ export function AppProvider({ children }) {
     if (selectedColumnId) await touchColumnUpdatedAt(selectedColumnId);
   };
 
-  // 一鍵清空目前專欄的所有展圖 (自動觸發 updatedAt)
+  // 一鍵清空目前專欄的所有展圖
   const handleDeleteAllImages = async () => {
     if (!selectedColumnId || columnImages.length === 0) return;
     if (!window.confirm(`⚠️ 警告：確定要一鍵刪除此專欄中的所有 ${columnImages.length} 張展圖嗎？（留言記帳不會受到影響）`)) return;
@@ -315,6 +361,13 @@ export function AppProvider({ children }) {
       }}
     >
       {children}
+
+      {/* ⭐ 雙擊返回鍵退出提示 Toast ⭐ */}
+      {exitToastVisible && (
+        <div className="fixed bottom-16 left-1/2 -translate-x-1/2 z-50 bg-[#161348] text-white text-xs font-black px-4 py-2 rounded-full shadow-lg border border-[#a1cdc4] animate-bounce">
+          再按一次返回鍵退出 CollectTrack
+        </div>
+      )}
     </AppContext.Provider>
   );
 }
