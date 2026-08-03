@@ -117,7 +117,7 @@ export function AppProvider({ children }) {
   };
 
   // 新增留言記帳 (解析 "白厄小卡*1=$60")
-  const handleAddComment = async (text, author = '二次元同好') => {
+  const handleAddComment = async (text, author = 'LingLing_YuNa') => {
     if (!text || !text.trim() || !selectedColumnId) return;
     const parsed = parseLedgerComment(text);
     const newComment = {
@@ -132,6 +132,24 @@ export function AppProvider({ children }) {
 
     await dbSaveComment(newComment);
     setColumnComments(prev => [...prev, newComment]);
+  };
+
+  // ⭐ 編輯更新留言記帳 ⭐
+  const handleUpdateComment = async (id, newText) => {
+    if (!newText || !newText.trim()) return;
+    const existing = columnComments.find(c => c.id === id);
+    if (!existing) return;
+
+    const parsed = parseLedgerComment(newText);
+    const updatedComment = {
+      ...existing,
+      text: newText.trim(),
+      parsed,
+      updatedAt: new Date().toISOString()
+    };
+
+    await dbSaveComment(updatedComment);
+    setColumnComments(prev => prev.map(c => (c.id === id ? updatedComment : c)));
   };
 
   // 刪除留言記帳
@@ -155,7 +173,7 @@ export function AppProvider({ children }) {
     setIsImageModalOpen(false);
   };
 
-  // ⭐ 批量新增照片 (Batch Image Upload) ⭐
+  // 批量新增照片
   const handleAddImagesBatch = async (imagesList) => {
     if (!imagesList || imagesList.length === 0 || !selectedColumnId) return;
     
@@ -222,6 +240,7 @@ export function AppProvider({ children }) {
         handleDeleteColumn,
         handleResetData,
         handleAddComment,
+        handleUpdateComment,
         handleDeleteComment,
         handleAddImage,
         handleAddImagesBatch,

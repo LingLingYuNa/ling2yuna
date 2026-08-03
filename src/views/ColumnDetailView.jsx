@@ -1,7 +1,7 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import CommentLedger from '../components/CommentLedger';
-import { ArrowLeft, Plus, Image as ImageIcon, Edit3, Trash2, Maximize2, Calculator } from 'lucide-react';
+import { ArrowLeft, Plus, Image as ImageIcon, Edit3, Trash2, Maximize2, Calculator, ChevronUp, ChevronDown, Sparkles } from 'lucide-react';
 
 export default function ColumnDetailView() {
   const {
@@ -18,6 +18,9 @@ export default function ColumnDetailView() {
     handleDeleteColumn
   } = useApp();
 
+  // 專欄最上方的專欄介紹摺疊狀態 (預設摺疊收合，節省螢幕空間)
+  const [isHeaderCollapsed, setIsHeaderCollapsed] = useState(true);
+
   if (!currentColumn) {
     return (
       <div className="text-center py-20 text-[#4c4993] font-bold">
@@ -32,8 +35,8 @@ export default function ColumnDetailView() {
   };
 
   return (
-    <div className="space-y-6 animate-fade-in pb-12">
-      {/* 頂部導航與標題 */}
+    <div className="space-y-4 sm:space-y-6 animate-fade-in pb-12">
+      {/* 頂部導航與動作按鈕 */}
       <div className="flex items-center justify-between">
         <button
           onClick={() => setSelectedColumnId(null)}
@@ -44,6 +47,25 @@ export default function ColumnDetailView() {
         </button>
 
         <div className="flex items-center space-x-2">
+          {/* 折疊/展開專欄介紹切換按鈕 */}
+          <button
+            onClick={() => setIsHeaderCollapsed(!isHeaderCollapsed)}
+            className="inline-flex items-center gap-1 text-[#4c4993] text-xs font-extrabold bg-[#f4f5f1] hover:bg-white px-3 py-2 rounded-xl border border-[#4c4993]/30 transition cursor-pointer shadow-xs"
+            title={isHeaderCollapsed ? '展開專欄介紹' : '摺疊專欄介紹'}
+          >
+            {isHeaderCollapsed ? (
+              <>
+                <ChevronDown className="w-4 h-4 text-[#4c4993]" />
+                <span className="hidden sm:inline">展開介紹</span>
+              </>
+            ) : (
+              <>
+                <ChevronUp className="w-4 h-4 text-[#4c4993]" />
+                <span className="hidden sm:inline">摺疊介紹</span>
+              </>
+            )}
+          </button>
+
           <button
             onClick={handleEdit}
             className="p-2 bg-[#f4f5f1] hover:bg-white text-[#4c4993] rounded-xl border border-[#4c4993]/30 transition cursor-pointer shadow-xs"
@@ -61,63 +83,101 @@ export default function ColumnDetailView() {
         </div>
       </div>
 
-      {/* 專欄 Hero 標題區 (顯示專欄標題 + 專欄總花費) */}
-      <div className="relative rounded-3xl overflow-hidden border border-[#4c4993]/30 bg-[#1f1b63] shadow-xl min-h-[160px]">
-        {currentColumn.coverImage ? (
-          <div className="w-full relative overflow-hidden flex items-center justify-center bg-[#161348]">
-            <img
-              src={currentColumn.coverImage}
-              alt={currentColumn.title}
-              className="w-full h-auto max-h-[380px] object-cover"
-            />
-            <div className="absolute inset-0 bg-gradient-to-t from-[#161348] via-[#1f1b63]/85 to-[#1f1b63]/30" />
-          </div>
-        ) : (
-          <div className="h-36 sm:h-44 w-full bg-gradient-to-r from-[#161348] via-[#1f1b63] to-[#2d287d]" />
-        )}
-
-        <div className="p-6 sm:p-8 -mt-24 relative z-10 text-white flex flex-col md:flex-row md:items-end justify-between gap-4">
-          <div className="flex-1">
-            <div className="flex flex-wrap items-center gap-2 mb-2">
-              {/* 分類標籤：薄荷綠底 + 濃深藍黑字 */}
-              <span className="text-xs font-black px-3 py-1 rounded-full bg-[#a1cdc4] text-[#161348] shadow-md border border-white/60">
+      {/* ⭐ 專欄 Hero 標題與介紹區 (支援摺疊收合) ⭐ */}
+      <div className="relative rounded-3xl overflow-hidden border border-[#4c4993]/30 bg-[#1f1b63] shadow-xl transition-all duration-300">
+        {/* 折疊狀態 (Micro Bar) */}
+        {isHeaderCollapsed ? (
+          <div
+            onClick={() => setIsHeaderCollapsed(false)}
+            className="p-4 sm:p-5 text-white flex items-center justify-between cursor-pointer hover:bg-white/5 transition"
+          >
+            <div className="flex items-center space-x-3">
+              <span className="text-xs font-black px-2.5 py-0.5 rounded-full bg-[#a1cdc4] text-[#161348] shadow-xs">
                 {currentColumn.category}
               </span>
-              {(currentColumn.tags || []).map((t, idx) => (
-                /* 標籤：米白底 + 濃靛藍字 */
-                <span key={idx} className="text-xs font-bold text-[#161348] bg-[#f4f5f1] px-2.5 py-0.5 rounded-md border border-white/80 shadow-xs">
-                  #{t}
-                </span>
-              ))}
+              <h1 className="text-lg sm:text-xl font-black text-white tracking-tight line-clamp-1">
+                {currentColumn.title}
+              </h1>
             </div>
 
-            <h1 className="text-2xl sm:text-4xl font-black text-white tracking-tight mb-2 drop-shadow-md">
-              {currentColumn.title}
-            </h1>
-
-            <p className="text-white/95 text-sm max-w-3xl leading-relaxed font-medium drop-shadow-xs">
-              {currentColumn.description || '這個專欄暫無簡介備註。可在右上方編輯補充專欄簡介。'}
-            </p>
-          </div>
-
-          {/* ⭐ Hero 右下角醒目總花費卡片 ⭐ */}
-          <div className="bg-[#f4f5f1] border border-white/40 p-3.5 rounded-2xl text-[#161348] shadow-xl shrink-0 self-start md:self-auto">
-            <div className="text-[10px] font-extrabold uppercase tracking-wider text-[#4c4993] flex items-center gap-1 mb-0.5">
-              <Calculator className="w-3.5 h-3.5 text-[#4c4993]" />
-              專欄目前總花費
-            </div>
-            <div className="text-2xl font-black font-mono text-[#4c4993]">
-              NT$ {columnTotalAmount.toLocaleString()}
-            </div>
-            <div className="text-[10px] text-[#4c4993]/80 font-bold mt-0.5">
-              共 {columnLedgerItemsCount} 筆記帳 ({columnTotalQty} 件品項)
+            <div className="flex items-center space-x-3">
+              <span className="text-xs font-mono font-bold text-[#a1cdc4] hidden sm:inline">
+                累計: NT$ {columnTotalAmount.toLocaleString()}
+              </span>
+              <div className="text-xs text-white/80 flex items-center gap-1 font-bold">
+                <span>點擊展開介紹</span>
+                <ChevronDown className="w-4 h-4" />
+              </div>
             </div>
           </div>
-        </div>
+        ) : (
+          /* 展開完整 Hero 狀態 */
+          <div>
+            {currentColumn.coverImage ? (
+              <div className="w-full relative overflow-hidden flex items-center justify-center bg-[#161348]">
+                <img
+                  src={currentColumn.coverImage}
+                  alt={currentColumn.title}
+                  className="w-full h-auto max-h-[380px] object-cover"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-[#161348] via-[#1f1b63]/85 to-[#1f1b63]/30" />
+              </div>
+            ) : (
+              <div className="h-36 sm:h-44 w-full bg-gradient-to-r from-[#161348] via-[#1f1b63] to-[#2d287d]" />
+            )}
+
+            <div className="p-6 sm:p-8 -mt-24 relative z-10 text-white flex flex-col md:flex-row md:items-end justify-between gap-4">
+              <div className="flex-1">
+                <div className="flex flex-wrap items-center gap-2 mb-2">
+                  <span className="text-xs font-black px-3 py-1 rounded-full bg-[#a1cdc4] text-[#161348] shadow-md border border-white/60">
+                    {currentColumn.category}
+                  </span>
+                  {(currentColumn.tags || []).map((t, idx) => (
+                    <span key={idx} className="text-xs font-bold text-[#161348] bg-[#f4f5f1] px-2.5 py-0.5 rounded-md border border-white/80 shadow-xs">
+                      #{t}
+                    </span>
+                  ))}
+                </div>
+
+                <h1 className="text-2xl sm:text-4xl font-black text-white tracking-tight mb-2 drop-shadow-md">
+                  {currentColumn.title}
+                </h1>
+
+                <p className="text-white/95 text-sm max-w-3xl leading-relaxed font-medium drop-shadow-xs">
+                  {currentColumn.description || '這個專欄暫無簡介備註。可在右上方編輯補充專欄簡介。'}
+                </p>
+              </div>
+
+              {/* 右下角總花費與收合按鈕 */}
+              <div className="flex flex-col items-end gap-2 shrink-0">
+                <div className="bg-[#f4f5f1] border border-white/40 p-3.5 rounded-2xl text-[#161348] shadow-xl w-full sm:w-auto">
+                  <div className="text-[10px] font-extrabold uppercase tracking-wider text-[#4c4993] flex items-center gap-1 mb-0.5">
+                    <Calculator className="w-3.5 h-3.5 text-[#4c4993]" />
+                    專欄目前總花費
+                  </div>
+                  <div className="text-2xl font-black font-mono text-[#4c4993]">
+                    NT$ {columnTotalAmount.toLocaleString()}
+                  </div>
+                  <div className="text-[10px] text-[#4c4993]/80 font-bold mt-0.5">
+                    共 {columnLedgerItemsCount} 筆記帳 ({columnTotalQty} 件品項)
+                  </div>
+                </div>
+
+                <button
+                  onClick={() => setIsHeaderCollapsed(true)}
+                  className="text-xs text-white/80 hover:text-white flex items-center gap-1 cursor-pointer font-bold pt-1"
+                >
+                  <ChevronUp className="w-3.5 h-3.5" />
+                  <span>摺疊收合介紹</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* 響應式佈局：手機版留言在上方，電腦版留言在展圖右邊 */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6 items-start">
         
         {/* 區塊 1：留言記帳與金額總計區 (手機版: 在上方 / 電腦版: 在右側 lg:col-span-5 lg:order-2) */}
         <div className="lg:col-span-5 lg:order-2 w-full">
@@ -125,7 +185,7 @@ export default function ColumnDetailView() {
         </div>
 
         {/* 區塊 2：專欄展圖藝廊 (手機版: 在下方 / 電腦版: 在左側 lg:col-span-7 lg:order-1) */}
-        <div className="lg:col-span-7 lg:order-1 w-full space-y-4">
+        <div className="lg:col-span-7 lg:order-1 w-full space-y-3 sm:space-y-4">
           <div className="flex items-center justify-between">
             <h2 className="font-black text-lg text-[#4c4993] flex items-center gap-2">
               <ImageIcon className="w-5 h-5 text-[#4c4993]" />
@@ -140,7 +200,7 @@ export default function ColumnDetailView() {
             </button>
           </div>
 
-          {/* Pinterest 瀑布流 (Masonry Layout) */}
+          {/* ⭐ 手機版也用雙欄瀑布流 (columns-2 sm:columns-2 lg:columns-3) 完美錯落排版！ ⭐ */}
           {columnImages.length === 0 ? (
             <div className="bg-[#f4f5f1] rounded-2xl p-10 text-center border border-dashed border-[#4c4993]/40">
               <ImageIcon className="w-12 h-12 text-[#4c4993]/50 mx-auto mb-3" />
@@ -148,27 +208,27 @@ export default function ColumnDetailView() {
               <p className="text-xs text-[#4c4993]/70 font-semibold mt-1">點擊上方「新增美圖」批量上傳宣圖或插畫照片</p>
             </div>
           ) : (
-            <div className="columns-1 sm:columns-2 gap-4 space-y-4">
+            <div className="columns-2 sm:columns-2 lg:columns-3 gap-3 sm:gap-4 space-y-3 sm:space-y-4">
               {columnImages.map((img) => (
                 <div
                   key={img.id}
                   onClick={() => setLightboxImage(img)}
-                  className="break-inside-avoid group relative rounded-2xl overflow-hidden border border-[#4c4993]/30 bg-white cursor-pointer hover:border-[#4c4993] transition shadow-md hover:shadow-xl"
+                  className="break-inside-avoid group relative rounded-xl sm:rounded-2xl overflow-hidden border border-[#4c4993]/30 bg-white cursor-pointer hover:border-[#4c4993] transition shadow-xs sm:shadow-md hover:shadow-xl mb-3 sm:mb-4"
                 >
                   <img
                     src={img.url}
                     alt={img.caption || '專欄展圖'}
-                    className="w-full h-auto block object-contain rounded-2xl group-hover:scale-[1.02] transition duration-300"
+                    className="w-full h-auto block object-contain rounded-xl sm:rounded-2xl group-hover:scale-[1.02] transition duration-300"
                   />
 
-                  <div className="absolute inset-0 bg-gradient-to-t from-[#161348]/90 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition p-4 flex flex-col justify-between">
+                  <div className="absolute inset-0 bg-gradient-to-t from-[#161348]/90 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition p-2.5 sm:p-4 flex flex-col justify-between">
                     <div className="self-end">
-                      <span className="p-2 bg-[#f4f5f1] rounded-xl text-[#161348] font-bold inline-block shadow-md">
-                        <Maximize2 className="w-4 h-4" />
+                      <span className="p-1.5 sm:p-2 bg-[#f4f5f1] rounded-lg sm:rounded-xl text-[#161348] font-bold inline-block shadow-md">
+                        <Maximize2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                       </span>
                     </div>
                     <div>
-                      <p className="text-white font-bold text-xs line-clamp-2">
+                      <p className="text-white font-bold text-[10px] sm:text-xs line-clamp-2">
                         {img.caption || '點擊放大全螢幕檢視'}
                       </p>
                     </div>

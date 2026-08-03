@@ -1,7 +1,7 @@
 import React from 'react';
 import { useApp } from '../context/AppContext';
 import ColumnDetailView from './ColumnDetailView';
-import { Plus, FolderHeart, ArrowRight, MessageSquare, Sparkles, Image as ImageIcon, Calculator, Tag } from 'lucide-react';
+import { Plus, FolderHeart, ArrowRight, MessageSquare, Sparkles, Image as ImageIcon, Calculator } from 'lucide-react';
 
 export default function ColumnsView() {
   const { columns, selectedColumnId, setSelectedColumnId, setIsColumnModalOpen, setEditingColumn } = useApp();
@@ -38,7 +38,7 @@ export default function ColumnsView() {
         </button>
       </div>
 
-      {/* 專欄列表網格 (空白狀態 vs 有專欄狀態) */}
+      {/* 專欄列表網格 (手機版雙欄 columns-2 瀑布流) */}
       {columns.length === 0 ? (
         <div className="bg-[#f4f5f1] rounded-3xl p-12 text-center border-2 border-dashed border-[#bfc9eb] shadow-xs">
           <div className="w-16 h-16 bg-[#a1cdc4]/30 rounded-2xl flex items-center justify-center mx-auto mb-4 border border-[#a1cdc4]">
@@ -60,16 +60,16 @@ export default function ColumnsView() {
           </button>
         </div>
       ) : (
-        <div className="columns-1 md:columns-2 lg:columns-3 gap-6 space-y-6">
+        <div className="columns-2 sm:columns-2 lg:columns-3 gap-3 sm:gap-6 space-y-3 sm:space-y-6">
           {columns.map((col) => (
             <div
               key={col.id}
               onClick={() => setSelectedColumnId(col.id)}
-              className="break-inside-avoid group glass-card rounded-2xl overflow-hidden cursor-pointer transition-all duration-300 hover:-translate-y-1 flex flex-col justify-between"
+              className="break-inside-avoid group glass-card rounded-xl sm:rounded-2xl overflow-hidden cursor-pointer transition-all duration-300 hover:-translate-y-1 flex flex-col justify-between mb-3 sm:mb-6"
             >
               <div>
                 {/* 封面圖 (保留原圖尺寸比例) */}
-                <div className="w-full relative overflow-hidden bg-[#e8ebf7] min-h-[140px] flex items-center justify-center">
+                <div className="w-full relative overflow-hidden bg-[#e8ebf7] min-h-[120px] flex items-center justify-center">
                   {col.coverImage ? (
                     <img
                       src={col.coverImage}
@@ -77,45 +77,41 @@ export default function ColumnsView() {
                       className="w-full h-auto object-contain max-h-[360px] group-hover:scale-102 transition duration-500"
                     />
                   ) : (
-                    <div className="text-center p-8">
-                      <ImageIcon className="w-10 h-10 text-[#4c4993]/40 mx-auto mb-1" />
-                      <span className="text-xs text-[#4c4993] font-black">專欄展示圖</span>
+                    <div className="text-center p-4">
+                      <ImageIcon className="w-8 h-8 text-[#4c4993]/40 mx-auto mb-1" />
+                      <span className="text-[10px] text-[#4c4993] font-black">專欄展示圖</span>
                     </div>
                   )}
 
                   {/* 頂部左側：分類標籤 */}
-                  <div className="absolute top-3 left-3">
-                    <span className="text-xs font-black px-3 py-1 rounded-full bg-[#4c4993] text-white shadow-md border border-white/40">
+                  <div className="absolute top-2 left-2 sm:top-3 sm:left-3">
+                    <span className="text-[10px] sm:text-xs font-black px-2 py-0.5 sm:px-3 sm:py-1 rounded-full bg-[#4c4993] text-white shadow-md border border-white/40">
                       {col.category}
                     </span>
                   </div>
 
-                  {/* ⭐ 頂部右側：醒目展示目前總花費金額 ⭐ */}
-                  <div className="absolute top-3 right-3">
-                    <span className="text-xs font-black px-3 py-1 rounded-full bg-[#a1cdc4] text-[#161348] shadow-md border border-white/60 font-mono flex items-center gap-1">
-                      <Calculator className="w-3.5 h-3.5 text-[#161348]" />
+                  {/* 頂部右側：目前總花費 */}
+                  <div className="absolute top-2 right-2 sm:top-3 sm:right-3">
+                    <span className="text-[10px] sm:text-xs font-black px-2 py-0.5 sm:px-3 sm:py-1 rounded-full bg-[#a1cdc4] text-[#161348] shadow-md border border-white/60 font-mono flex items-center gap-1">
                       NT$ {(col.totalAmount || 0).toLocaleString()}
                     </span>
                   </div>
                 </div>
 
                 {/* 專欄內文 */}
-                <div className="p-5">
-                  <div className="flex items-start justify-between gap-2 mb-2">
-                    <h3 className="font-black text-lg text-[#4c4993] group-hover:text-[#2b2773] transition">
-                      {col.title}
-                    </h3>
-                  </div>
-
-                  <p className="text-[#4c4993]/90 text-xs line-clamp-3 leading-relaxed mb-4 font-semibold">
+                <div className="p-3 sm:p-5">
+                  <h3 className="font-black text-sm sm:text-lg text-[#4c4993] group-hover:text-[#2b2773] transition mb-1 sm:mb-2 line-clamp-1">
+                    {col.title}
+                  </h3>
+                  <p className="text-[#4c4993]/90 text-[10px] sm:text-xs line-clamp-2 leading-relaxed mb-2 sm:mb-4 font-semibold">
                     {col.description || '無簡介說明'}
                   </p>
 
                   {/* 標籤 */}
                   {col.tags && col.tags.length > 0 && (
-                    <div className="flex flex-wrap gap-1.5 mb-2">
+                    <div className="flex flex-wrap gap-1 mb-2">
                       {col.tags.map((t, idx) => (
-                        <span key={idx} className="text-[10px] text-[#161348] bg-[#a1cdc4]/40 px-2 py-0.5 rounded border border-[#a1cdc4] font-extrabold">
+                        <span key={idx} className="text-[9px] sm:text-[10px] text-[#161348] bg-[#a1cdc4]/40 px-1.5 py-0.5 rounded border border-[#a1cdc4] font-extrabold">
                           #{t}
                         </span>
                       ))}
@@ -124,14 +120,12 @@ export default function ColumnsView() {
                 </div>
               </div>
 
-              {/* 底部：醒目展示總花費累計與進入指引 */}
-              <div className="px-5 py-3 border-t border-[#bfc9eb]/60 bg-[#f4f5f1] flex items-center justify-between text-xs text-[#4c4993]">
-                <div className="flex items-center gap-1.5 font-black text-[#4c4993]">
-                  <Calculator className="w-4 h-4 text-[#4c4993]" />
-                  <span>目前花費: <strong className="font-mono text-sm text-[#161348]">NT$ {(col.totalAmount || 0).toLocaleString()}</strong></span>
-                  <span className="text-[10px] text-[#4c4993]/70 font-normal">({col.commentsCount || 0} 則記帳)</span>
-                </div>
-                <ArrowRight className="w-4 h-4 text-[#4c4993] group-hover:translate-x-1 transition shrink-0" />
+              {/* 底部指引 */}
+              <div className="px-3 py-2 sm:px-5 sm:py-3 border-t border-[#bfc9eb]/60 bg-[#f4f5f1] flex items-center justify-between text-[10px] sm:text-xs text-[#4c4993]">
+                <span className="font-black font-mono text-[#161348]">
+                  NT$ {(col.totalAmount || 0).toLocaleString()}
+                </span>
+                <ArrowRight className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-[#4c4993] group-hover:translate-x-1 transition shrink-0" />
               </div>
             </div>
           ))}

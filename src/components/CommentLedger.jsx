@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
-import { MessageSquare, Plus, Trash2, Calculator, Sparkles, Tag, ShoppingBag } from 'lucide-react';
+import { MessageSquare, Plus, Trash2, Edit3, Calculator, Sparkles, Tag, ShoppingBag, Check, X } from 'lucide-react';
 import { parseLedgerComment } from '../utils/ledgerParser';
 
 export default function CommentLedger() {
@@ -10,12 +10,17 @@ export default function CommentLedger() {
     columnTotalQty,
     columnLedgerItemsCount,
     handleAddComment,
+    handleUpdateComment,
     handleDeleteComment
   } = useApp();
 
   const [inputVal, setInputVal] = useState('');
   const [authorVal, setAuthorVal] = useState('LingLing_YuNa');
   const [previewParsed, setPreviewParsed] = useState(null);
+
+  // 編輯狀態
+  const [editingId, setEditingId] = useState(null);
+  const [editingText, setEditingText] = useState('');
 
   const handleInputChange = (e) => {
     const val = e.target.value;
@@ -35,9 +40,19 @@ export default function CommentLedger() {
     setPreviewParsed(null);
   };
 
-  const handleQuickInsert = (text) => {
-    setInputVal(text);
-    setPreviewParsed(parseLedgerComment(text));
+  // 開始編輯留言
+  const startEdit = (cmt) => {
+    setEditingId(cmt.id);
+    setEditingText(cmt.text);
+  };
+
+  // 儲存編輯留言
+  const saveEdit = (id) => {
+    if (editingText.trim()) {
+      handleUpdateComment(id, editingText.trim());
+    }
+    setEditingId(null);
+    setEditingText('');
   };
 
   return (
@@ -55,7 +70,7 @@ export default function CommentLedger() {
                 {columnComments.length} 則
               </span>
             </h3>
-            <p className="text-xs text-[#4c4993] font-bold">隨手打 `白厄小卡*1=$60` 即可自動辨識並總計金額</p>
+            <p className="text-xs text-[#4c4993] font-bold">輸入 `品項*數量=$金額` 自動辨識並加總金額</p>
           </div>
         </div>
 
@@ -66,39 +81,13 @@ export default function CommentLedger() {
         </div>
       </div>
 
-      {/* 快捷範例按鈕列 */}
-      <div className="flex flex-wrap gap-2 mb-4">
-        <span className="text-xs text-[#4c4993] font-bold self-center mr-1">快捷示範:</span>
-        <button
-          type="button"
-          onClick={() => handleQuickInsert('白厄小卡*1=$60')}
-          className="text-xs bg-white text-[#4c4993] hover:bg-[#4c4993] hover:text-white border border-[#4c4993]/40 px-2.5 py-1 rounded-lg transition flex items-center gap-1 cursor-pointer font-black shadow-xs"
-        >
-          <Plus className="w-3 h-3" /> 白厄小卡*1=$60
-        </button>
-        <button
-          type="button"
-          onClick={() => handleQuickInsert('白厄徽章*2=$180')}
-          className="text-xs bg-white text-[#4c4993] hover:bg-[#4c4993] hover:text-white border border-[#4c4993]/40 px-2.5 py-1 rounded-lg transition flex items-center gap-1 cursor-pointer font-black shadow-xs"
-        >
-          <Plus className="w-3 h-3" /> 白厄徽章*2=$180
-        </button>
-        <button
-          type="button"
-          onClick={() => handleQuickInsert('白厄壓克力立牌 $350')}
-          className="text-xs bg-white text-[#4c4993] hover:bg-[#4c4993] hover:text-white border border-[#4c4993]/40 px-2.5 py-1 rounded-lg transition flex items-center gap-1 cursor-pointer font-black shadow-xs"
-        >
-          <Plus className="w-3 h-3" /> 白厄立牌 $350
-        </button>
-      </div>
-
-      {/* 留言紀錄列表 */}
+      {/* 留言紀錄列表 (支援編輯與刪除) */}
       <div className="flex-1 overflow-y-auto max-h-[360px] space-y-3 pr-1 mb-4">
         {columnComments.length === 0 ? (
           <div className="text-center py-10 bg-white rounded-xl border border-dashed border-[#4c4993]/40">
             <ShoppingBag className="w-10 h-10 text-[#4c4993]/60 mx-auto mb-2" />
             <p className="text-[#4c4993] font-black text-sm">此專欄尚無留言記帳紀錄</p>
-            <p className="text-xs text-[#4c4993] font-bold mt-1">在下方輸入 `白厄小卡*1=$60` 開始隨手記帳吧！</p>
+            <p className="text-xs text-[#4c4993] font-bold mt-1">在下方輸入記帳文字開始記錄吧！</p>
           </div>
         ) : (
           columnComments.map((cmt) => (
@@ -119,31 +108,71 @@ export default function CommentLedger() {
                   )}
                 </div>
 
-                <p className="text-[#161348] text-sm font-bold">{cmt.text}</p>
-
-                {/* 智慧解析詳細標籤 */}
-                {cmt.parsed?.isLedger && (
-                  <div className="mt-2 inline-flex items-center gap-3 bg-[#f4f5f1] px-3 py-1.5 rounded-lg text-xs font-mono border border-[#4c4993]/30">
-                    <span className="text-[#4c4993] font-black flex items-center gap-1">
-                      <Tag className="w-3 h-3 text-[#4c4993]" />
-                      {cmt.parsed.name}
-                    </span>
-                    <span className="text-[#4c4993] font-extrabold">×{cmt.parsed.qty}</span>
-                    <span className="text-[#4c4993] font-black ml-auto text-sm">
-                      NT$ {cmt.parsed.total.toLocaleString()}
-                    </span>
+                {/* 編輯模式 vs 正常展示模式 */}
+                {editingId === cmt.id ? (
+                  <div className="flex items-center gap-2 mt-1">
+                    <input
+                      type="text"
+                      value={editingText}
+                      onChange={(e) => setEditingText(e.target.value)}
+                      className="flex-1 bg-[#f4f5f1] border border-[#4c4993] rounded-lg px-3 py-1.5 text-sm font-bold text-[#161348] focus:outline-none"
+                      autoFocus
+                    />
+                    <button
+                      onClick={() => saveEdit(cmt.id)}
+                      className="p-1.5 bg-[#4c4993] text-white rounded-lg hover:bg-[#363373] transition cursor-pointer"
+                      title="儲存修改"
+                    >
+                      <Check className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => setEditingId(null)}
+                      className="p-1.5 bg-slate-200 text-slate-700 rounded-lg hover:bg-slate-300 transition cursor-pointer"
+                      title="取消"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
                   </div>
+                ) : (
+                  <>
+                    <p className="text-[#161348] text-sm font-bold">{cmt.text}</p>
+
+                    {/* 智慧解析詳細標籤 */}
+                    {cmt.parsed?.isLedger && (
+                      <div className="mt-2 inline-flex items-center gap-3 bg-[#f4f5f1] px-3 py-1.5 rounded-lg text-xs font-mono border border-[#4c4993]/30">
+                        <span className="text-[#4c4993] font-black flex items-center gap-1">
+                          <Tag className="w-3 h-3 text-[#4c4993]" />
+                          {cmt.parsed.name}
+                        </span>
+                        <span className="text-[#4c4993] font-extrabold">×{cmt.parsed.qty}</span>
+                        <span className="text-[#4c4993] font-black ml-auto text-sm">
+                          NT$ {cmt.parsed.total.toLocaleString()}
+                        </span>
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
 
-              {/* 刪除按鈕 */}
-              <button
-                onClick={() => handleDeleteComment(cmt.id)}
-                className="opacity-0 group-hover:opacity-100 transition text-[#4c4993]/60 hover:text-red-600 p-1.5 rounded-lg hover:bg-red-50 cursor-pointer"
-                title="刪除留言紀錄"
-              >
-                <Trash2 className="w-4 h-4" />
-              </button>
+              {/* 動作按鈕區：編輯與刪除 */}
+              {editingId !== cmt.id && (
+                <div className="flex items-center space-x-1 opacity-90 group-hover:opacity-100 transition">
+                  <button
+                    onClick={() => startEdit(cmt)}
+                    className="text-[#4c4993]/70 hover:text-[#4c4993] p-1.5 rounded-lg hover:bg-[#bfc9eb]/30 transition cursor-pointer"
+                    title="編輯留言"
+                  >
+                    <Edit3 className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => handleDeleteComment(cmt.id)}
+                    className="text-[#4c4993]/70 hover:text-red-600 p-1.5 rounded-lg hover:bg-red-50 transition cursor-pointer"
+                    title="刪除留言"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+              )}
             </div>
           ))
         )}
@@ -169,15 +198,15 @@ export default function CommentLedger() {
             type="text"
             value={inputVal}
             onChange={handleInputChange}
-            placeholder="請輸入留言或記帳 (例: 白厄小卡*1=$60)"
+            placeholder="請輸入留言或記帳 (例: 宣圖周邊*1=$60)"
             className="flex-1 bg-white border border-[#4c4993]/40 focus:border-[#4c4993] focus:ring-2 focus:ring-[#bfc9eb] rounded-xl px-4 py-2.5 text-sm text-[#161348] font-bold placeholder-[#4c4993]/50 outline-none transition shadow-xs"
           />
           <button
             type="submit"
             disabled={!inputVal.trim()}
-            className="btn-noguchi-primary disabled:opacity-50 font-black px-5 py-2.5 rounded-xl transition flex items-center gap-1.5 cursor-pointer"
+            className="btn-noguchi-primary disabled:opacity-50 font-black px-5 py-2.5 rounded-xl transition flex items-center gap-1.5 cursor-pointer shadow-md"
           >
-            <Plus className="w-4 h-4" />
+            <Plus className="w-4 h-4 text-white" />
             <span className="hidden sm:inline">發布記帳</span>
           </button>
         </div>
