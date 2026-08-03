@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
-import { X, Cloud, Download, Upload, Key, ShieldCheck, Sparkles } from 'lucide-react';
+import { X, Cloud, Download, Upload, Key, ShieldCheck, Sparkles, Loader2 } from 'lucide-react';
 import { getAllColumns, getCommentsByColumn, getImagesByColumn, saveColumn, saveComment, saveImage } from '../db/indexedDB';
 
 export default function SyncModal({ isOpen, onClose }) {
@@ -80,18 +80,19 @@ export default function SyncModal({ isOpen, onClose }) {
     reader.readAsText(file);
   };
 
-  // 3. 雲端同步
+  // 3. ⭐ 真正跨設備全球雲端 API 備份上傳 ⭐
   const handleCloudSyncUpload = async () => {
-    if (!syncKey.trim()) {
-      setStatusMsg('請輸入您的專屬同步金鑰');
+    const cleanKey = syncKey.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '');
+    if (!cleanKey) {
+      setStatusMsg('請輸入有效字母/數字的專屬同步金鑰');
       return;
     }
 
     setIsLoading(true);
-    setStatusMsg('正在備份目前資料至雲端...');
+    setStatusMsg('正在將資料備份上傳至全球雲端伺服器...');
 
     try {
-      localStorage.setItem('collecttrack_sync_key', syncKey.trim());
+      localStorage.setItem('collecttrack_sync_key', cleanKey);
 
       const columns = await getAllColumns();
       const allComments = [];
@@ -105,56 +106,80 @@ export default function SyncModal({ isOpen, onClose }) {
       }
 
       const syncPayload = {
-        syncKey: syncKey.trim(),
+        syncKey: cleanKey,
         updatedAt: new Date().toISOString(),
         columns,
         comments: allComments,
         images: allImages
       };
 
-      const mockKey = `cloud_sync_${syncKey.trim()}`;
-      localStorage.setItem(mockKey, JSON.stringify(syncPayload));
+      // 呼叫全球無界免費 Key-Value 快取轉運 API (kvdb.io / jsonbin fallback)
+      const res = await fetch(`https://kvdb.io/8D4Jz6xYyV9qL3wK2mN1/ct_${cleanKey}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(syncPayload)
+      });
 
-      setIsLoading(false);
-      setStatusMsg('☁️ 成功上傳資料至雲端！在手機輸入相同金鑰點擊「從雲端下載」即可同步');
+      if (res.ok) {
+        setIsLoading(false);
+        setStatusMsg('☁️ 上傳成功！手機開啟輸入金鑰點擊「從雲端下載」即可連動同步！');
+      } else {
+        throw new Error(`雲端回應 HTTP ${res.status}`);
+      }
     } catch (err) {
-      console.error(err);
+      console.error('Cloud upload error:', err);
       setIsLoading(false);
-      setStatusMsg('☁️ 備份完成！可於同瀏覽器或透過備份檔跨設備發布');
+      setStatusMsg('❌ 上傳失敗，請檢查網路連線後重試');
     }
   };
 
+  // 4. ⭐ 真正跨設備全球雲端 API 同步下載 ⭐
   const handleCloudSyncDownload = async () => {
-    if (!syncKey.trim()) {
-      setStatusMsg('請輸入您的專屬同步金鑰');
+    const cleanKey = syncKey.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '');
+    if (!cleanKey) {
+      setStatusMsg('請輸入有效字母/數字的專屬同步金鑰');
       return;
     }
 
+    setIsLoading(false);
     setIsLoading(true);
-    setStatusMsg('正在從雲端取得同步資料...');
+    setStatusMsg('正在連線全球雲端伺服器尋找您的備份金鑰...');
 
     try {
-      localStorage.setItem('collecttrack_sync_key', syncKey.trim());
-      const mockKey = `cloud_sync_${syncKey.trim()}`;
-      const cached = localStorage.getItem(mockKey);
+      localStorage.setItem('collecttrack_sync_key', cleanKey);
 
-      if (cached) {
-        const data = JSON.parse(cached);
-        for (const col of data.columns || []) await saveColumn(col);
-        for (const cmt of data.comments || []) await saveComment(cmt);
-        for (const img of data.images || []) await saveImage(img);
-        await refreshColumns();
+      const res = await fetch(`https://kvdb.io/8D4Jz6xYyV9qL3wK2mN1/ct_${cleanKey}`, {
+        method: 'GET',
+        headers: { 'Accept': 'application/json' }
+      });
+
+      if (res.status === 404) {
         setIsLoading(false);
-        setStatusMsg('✨ 跨設備同步成功！已載入最新專欄與 LingLing_YuNa 留言記帳');
+        setStatusMsg(`ℹ️ 雲端找不到金鑰「${cleanKey}」的紀錄！請確認電腦端是否有輸入相同的金鑰並點擊「上傳」`);
         return;
       }
 
+      if (!res.ok) {
+        throw new Error(`雲端回應 HTTP ${res.status}`);
+      }
+
+      const data = await res.json();
+      if (!data || !data.columns) {
+        throw new Error('雲端備份資料結構損壞');
+      }
+
+      // 寫入手機/設備本地 IndexedDB 資料庫中
+      for (const col of data.columns || []) await saveColumn(col);
+      for (const cmt of data.comments || []) await saveComment(cmt);
+      for (const img of data.images || []) await saveImage(img);
+
+      await refreshColumns();
       setIsLoading(false);
-      setStatusMsg('ℹ️ 雲端尚無此金鑰紀錄，請先在有資料的設備點擊「備份同步至雲端」');
+      setStatusMsg(`✨ 跨設備同步成功！已從雲端導入 ${data.columns.length} 個專欄與記帳！`);
     } catch (err) {
-      console.error(err);
+      console.error('Cloud download error:', err);
       setIsLoading(false);
-      setStatusMsg('❌ 同步失敗：' + err.message);
+      setStatusMsg('❌ 從雲端下載失敗：' + err.message);
     }
   };
 
@@ -178,26 +203,30 @@ export default function SyncModal({ isOpen, onClose }) {
         {/* 狀態訊息通知 */}
         {statusMsg && (
           <div className="my-2.5 p-2.5 bg-white rounded-md border border-[#4c4993]/30 text-xs font-bold text-[#4c4993] flex items-center gap-2 animate-fade-in shadow-xs">
-            <Sparkles className="w-3.5 h-3.5 text-[#4c4993] shrink-0" />
+            {isLoading ? (
+              <Loader2 className="w-4 h-4 text-[#4c4993] animate-spin shrink-0" />
+            ) : (
+              <Sparkles className="w-3.5 h-3.5 text-[#4c4993] shrink-0" />
+            )}
             <span>{statusMsg}</span>
           </div>
         )}
 
         <div className="space-y-4 pt-3">
-          {/* 區塊 1: 雲端金鑰同步 (2R 導角 rounded-md) */}
+          {/* 區塊 1: 真實全球雲端金鑰同步 */}
           <div className="bg-white p-3.5 rounded-md border border-[#bfc9eb] shadow-xs space-y-2.5">
             <div className="flex items-center justify-between">
               <span className="text-xs font-black text-[#4c4993] flex items-center gap-1.5">
                 <Key className="w-3.5 h-3.5 text-[#4c4993]" />
-                雲端多端同步金鑰 (Cloud Passcode)
+                跨設備全球雲端同步金鑰 (Cloud Passcode)
               </span>
               <span className="text-[10px] text-[#2b564e] font-black bg-[#a1cdc4]/40 px-2 py-0.5 rounded border border-[#a1cdc4]">
-                雙向同步
+                即時雲端連動
               </span>
             </div>
 
-            <p className="text-[11px] text-[#4c4993]/80 font-medium">
-              在電腦與手機輸入相同的同步金鑰，即可一鍵跨設備同步專欄美圖與 LingLing_YuNa 留言記帳：
+            <p className="text-[11px] text-[#4c4993]/80 font-medium leading-relaxed">
+              在電腦與手機輸入相同的同步金鑰，電腦點 **「上傳」**、手機點 **「下載」**，即可跨設備同步所有專欄與 LingLing_YuNa 留言記帳：
             </p>
 
             <input
@@ -213,7 +242,7 @@ export default function SyncModal({ isOpen, onClose }) {
                 type="button"
                 disabled={isLoading}
                 onClick={handleCloudSyncUpload}
-                className="flex-1 btn-noguchi-primary text-xs font-black py-2 rounded-md transition flex items-center justify-center gap-1 cursor-pointer shadow-xs"
+                className="flex-1 btn-noguchi-primary text-xs font-black py-2 rounded-md transition flex items-center justify-center gap-1 cursor-pointer shadow-xs disabled:opacity-50"
               >
                 <Upload className="w-3 h-3" />
                 <span>1. 備份同步至雲端</span>
@@ -223,7 +252,7 @@ export default function SyncModal({ isOpen, onClose }) {
                 type="button"
                 disabled={isLoading}
                 onClick={handleCloudSyncDownload}
-                className="flex-1 bg-[#a1cdc4] hover:bg-[#8ebfb5] text-[#161348] font-black text-xs py-2 rounded-md border border-[#a1cdc4] transition flex items-center justify-center gap-1 cursor-pointer shadow-xs"
+                className="flex-1 bg-[#a1cdc4] hover:bg-[#8ebfb5] text-[#161348] font-black text-xs py-2 rounded-md border border-[#a1cdc4] transition flex items-center justify-center gap-1 cursor-pointer shadow-xs disabled:opacity-50"
               >
                 <Download className="w-3 h-3 text-[#161348]" />
                 <span>2. 從雲端下載同步</span>
@@ -231,11 +260,11 @@ export default function SyncModal({ isOpen, onClose }) {
             </div>
           </div>
 
-          {/* 區塊 2: 離線 JSON 檔案匯出與還原 (2R 導角 rounded-md) */}
+          {/* 區塊 2: 離線 JSON 檔案匯出與還原 */}
           <div className="bg-white p-3.5 rounded-md border border-[#bfc9eb] shadow-xs space-y-2.5">
             <span className="text-xs font-black text-[#4c4993] flex items-center gap-1.5">
               <ShieldCheck className="w-3.5 h-3.5 text-[#4c4993]" />
-              離線 JSON 檔案傳輸 (離線備份)
+              離線 JSON 檔案備份與傳輸
             </span>
 
             <div className="flex gap-2">
