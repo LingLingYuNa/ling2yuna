@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useLayoutEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import ColumnDetailView from './ColumnDetailView';
 import ExcelImportModal from '../components/ExcelImportModal';
@@ -8,8 +8,24 @@ export default function ColumnsView() {
   const { columns, selectedColumnId, setSelectedColumnId, setIsColumnModalOpen, setEditingColumn } = useApp();
   const [isExcelModalOpen, setIsExcelModalOpen] = useState(false);
 
-  // 專欄時間與花費排序模式: 'newest' | 'oldest' | 'amount_desc' | 'name'
+  // 專欄時間與花費排序模式
   const [sortBy, setSortBy] = useState('newest');
+
+  // ⭐ 自動恢復回到上一頁時的滾動位置 (Scroll Position Restoration) ⭐
+  useLayoutEffect(() => {
+    if (!selectedColumnId) {
+      const savedPos = sessionStorage.getItem('collecttrack_scroll_pos');
+      if (savedPos !== null) {
+        const top = parseInt(savedPos, 10);
+        if (!isNaN(top)) {
+          // 使用 setTimeout 確保 DOM 渲染完畢後精確滾動定位
+          setTimeout(() => {
+            window.scrollTo({ top, behavior: 'instant' });
+          }, 0);
+        }
+      }
+    }
+  }, [selectedColumnId]);
 
   // 計算動態排序後的專欄列表
   const sortedColumns = useMemo(() => {
@@ -51,7 +67,7 @@ export default function ColumnsView() {
 
         {/* 動作按鈕區: 時間排序 + Excel 匯入 + 建立專欄 */}
         <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
-          {/* ⭐ 時間與花費動態排序切換選單 ⭐ */}
+          {/* 時間與花費動態排序切換選單 */}
           <div className="relative inline-flex items-center bg-[#f4f5f1] border border-[#4c4993]/30 rounded-lg px-2.5 py-1.5 shadow-xs">
             <ArrowUpDown className="w-3.5 h-3.5 text-[#4c4993] mr-1.5 shrink-0" />
             <span className="text-[11px] font-black text-[#4c4993] mr-1 hidden sm:inline">排序:</span>
@@ -83,13 +99,13 @@ export default function ColumnsView() {
             }}
             className="btn-noguchi-primary font-black text-xs px-3.5 py-1.5 rounded-lg transition flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
           >
-            <Plus className="w-3.5 h-3.5 text-[#ffffff]" />
+            <Plus className="w-3.5 h-3.5 text-white" />
             <span>建立展示專欄</span>
           </button>
         </div>
       </div>
 
-      {/* ⭐ 專欄列表網格：改用 Row-First CSS Grid (grid-cols-2 lg:grid-cols-3)，確保排序依照左 1、右 2、下左 3、下右 4 順序呈現！ ⭐ */}
+      {/* 專欄列表網格：Row-First CSS Grid (grid-cols-2 lg:grid-cols-3) */}
       {sortedColumns.length === 0 ? (
         <div className="bg-[#f4f5f1] rounded-lg p-10 text-center border-2 border-dashed border-[#bfc9eb] shadow-xs">
           <div className="w-12 h-12 bg-[#a1cdc4]/30 rounded-lg flex items-center justify-center mx-auto mb-3 border border-[#a1cdc4]">
@@ -180,7 +196,7 @@ export default function ColumnsView() {
                 </div>
               </div>
 
-              {/* 底部指引 (顯示建立日期) */}
+              {/* 底部指引 */}
               <div className="px-3 py-2 border-t border-[#bfc9eb]/60 bg-[#f4f5f1] flex items-center justify-between text-[10px] sm:text-xs text-[#4c4993] mt-auto">
                 <div className="flex items-center gap-1 text-[#4c4993]/80 font-mono font-bold">
                   <Clock className="w-3 h-3 text-[#4c4993]" />

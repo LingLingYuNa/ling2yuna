@@ -20,7 +20,7 @@ const AppContext = createContext();
 export function AppProvider({ children }) {
   const [columns, setColumns] = useState([]);
   
-  // 網頁重新整理狀態持久化
+  // 網頁狀態持久化
   const [selectedColumnId, setSelectedColumnIdState] = useState(() => {
     const hash = window.location.hash;
     if (hash && hash.startsWith('#column/')) {
@@ -30,15 +30,18 @@ export function AppProvider({ children }) {
     return savedId === 'HOME' ? null : savedId || null;
   });
 
+  // 包裝 setSelectedColumnId，在離開總覽頁時自動紀錄當前的滾動高度 scrollY
   const setSelectedColumnId = (id) => {
-    setSelectedColumnIdState(id);
     if (id) {
+      // 點擊進入專欄時，記錄當前總覽牆的垂直滾動高度
+      sessionStorage.setItem('collecttrack_scroll_pos', window.scrollY.toString());
       localStorage.setItem('collecttrack_selected_column_id', id);
       window.history.replaceState(null, '', `#column/${id}`);
     } else {
       localStorage.setItem('collecttrack_selected_column_id', 'HOME');
       window.history.replaceState(null, '', window.location.pathname);
     }
+    setSelectedColumnIdState(id);
   };
 
   // 當前選取專欄的子資料
@@ -137,7 +140,7 @@ export function AppProvider({ children }) {
     setColumnImages([]);
   };
 
-  // 新增留言記帳 (解析 "白厄小卡*1=$60")
+  // 新增留言記帳
   const handleAddComment = async (text, author = 'LingLing_YuNa') => {
     if (!text || !text.trim() || !selectedColumnId) return;
     const parsed = parseLedgerComment(text);
@@ -226,7 +229,7 @@ export function AppProvider({ children }) {
     if (lightboxImage?.id === id) setLightboxImage(null);
   };
 
-  // ⭐ 批次一鍵刪除選取的照片 ⭐
+  // 批次一鍵刪除選取的照片
   const handleDeleteImagesBatch = async (ids) => {
     if (!ids || ids.length === 0) return;
     if (!window.confirm(`確定要一次刪除已選取的 ${ids.length} 張展圖嗎？此動作無法復原！`)) return;
@@ -235,7 +238,7 @@ export function AppProvider({ children }) {
     if (lightboxImage && ids.includes(lightboxImage.id)) setLightboxImage(null);
   };
 
-  // ⭐ 一鍵清空目前專欄的所有展圖 ⭐
+  // 一鍵清空目前專欄的所有展圖
   const handleDeleteAllImages = async () => {
     if (!selectedColumnId || columnImages.length === 0) return;
     if (!window.confirm(`⚠️ 警告：確定要一鍵刪除此專欄中的所有 ${columnImages.length} 張展圖嗎？（留言記帳不會受到影響）`)) return;
