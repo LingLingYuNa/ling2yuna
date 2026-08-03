@@ -1,12 +1,33 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useApp } from '../context/AppContext';
 import ColumnDetailView from './ColumnDetailView';
 import ExcelImportModal from '../components/ExcelImportModal';
-import { Plus, FolderHeart, ArrowRight, Sparkles, Image as ImageIcon, FileSpreadsheet } from 'lucide-react';
+import { Plus, FolderHeart, ArrowRight, Sparkles, Image as ImageIcon, FileSpreadsheet, ArrowUpDown, Clock, Calendar, DollarSign } from 'lucide-react';
 
 export default function ColumnsView() {
   const { columns, selectedColumnId, setSelectedColumnId, setIsColumnModalOpen, setEditingColumn } = useApp();
   const [isExcelModalOpen, setIsExcelModalOpen] = useState(false);
+
+  // 專欄時間與花費排序模式: 'newest' | 'oldest' | 'amount_desc' | 'name'
+  const [sortBy, setSortBy] = useState('newest');
+
+  // 計算動態排序後的專欄列表
+  const sortedColumns = useMemo(() => {
+    if (!columns || columns.length === 0) return [];
+    
+    return [...columns].sort((a, b) => {
+      if (sortBy === 'newest') {
+        return new Date(b.createdAt || 0) - new Date(a.createdAt || 0);
+      } else if (sortBy === 'oldest') {
+        return new Date(a.createdAt || 0) - new Date(b.createdAt || 0);
+      } else if (sortBy === 'amount_desc') {
+        return (b.totalAmount || 0) - (a.totalAmount || 0);
+      } else if (sortBy === 'name') {
+        return (a.title || '').localeCompare(b.title || '', 'zh-TW');
+      }
+      return 0;
+    });
+  }, [columns, sortBy]);
 
   if (selectedColumnId) {
     return <ColumnDetailView />;
@@ -28,14 +49,30 @@ export default function ColumnsView() {
           </p>
         </div>
 
-        {/* 動作按鈕區: 建立專欄 & Excel 匯入 */}
-        <div className="flex items-center space-x-2 self-start sm:self-auto">
+        {/* 動作按鈕區: 時間排序 + Excel 匯入 + 建立專欄 */}
+        <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
+          {/* ⭐ 時間與花費動態排序切換選單 ⭐ */}
+          <div className="relative inline-flex items-center bg-[#f4f5f1] border border-[#4c4993]/30 rounded-lg px-2.5 py-1.5 shadow-xs">
+            <ArrowUpDown className="w-3.5 h-3.5 text-[#4c4993] mr-1.5 shrink-0" />
+            <span className="text-[11px] font-black text-[#4c4993] mr-1 hidden sm:inline">排序:</span>
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value)}
+              className="bg-transparent text-xs font-extrabold text-[#161348] focus:outline-none cursor-pointer pr-1"
+            >
+              <option value="newest">🕒 時間：由新到舊 (最新建立)</option>
+              <option value="oldest">⏳ 時間：由舊到新 (最早建立)</option>
+              <option value="amount_desc">💰 依花費金額：高到低</option>
+              <option value="name">🔤 依專欄名稱字典序</option>
+            </select>
+          </div>
+
           <button
             onClick={() => setIsExcelModalOpen(true)}
-            className="bg-[#f4f5f1] hover:bg-white text-[#4c4993] font-black text-xs px-3.5 py-2 rounded-lg border border-[#4c4993]/30 transition flex items-center gap-1.5 cursor-pointer shadow-xs"
+            className="bg-[#f4f5f1] hover:bg-white text-[#4c4993] font-black text-xs px-3 py-1.5 rounded-lg border border-[#4c4993]/30 transition flex items-center gap-1.5 cursor-pointer shadow-xs"
             title="從 Excel (.xlsx, .csv) 批量匯入專欄"
           >
-            <FileSpreadsheet className="w-4 h-4 text-[#4c4993]" />
+            <FileSpreadsheet className="w-3.5 h-3.5 text-[#4c4993]" />
             <span>Excel 匯入</span>
           </button>
 
@@ -44,16 +81,16 @@ export default function ColumnsView() {
               setEditingColumn(null);
               setIsColumnModalOpen(true);
             }}
-            className="btn-noguchi-primary font-black text-xs px-4 py-2 rounded-lg transition flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
+            className="btn-noguchi-primary font-black text-xs px-3.5 py-1.5 rounded-lg transition flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
           >
-            <Plus className="w-4 h-4 text-white" />
+            <Plus className="w-3.5 h-3.5 text-white" />
             <span>建立展示專欄</span>
           </button>
         </div>
       </div>
 
       {/* 專欄列表網格 (手機版雙欄 2R 俐落微圓角 8px) */}
-      {columns.length === 0 ? (
+      {sortedColumns.length === 0 ? (
         <div className="bg-[#f4f5f1] rounded-lg p-10 text-center border-2 border-dashed border-[#bfc9eb] shadow-xs">
           <div className="w-12 h-12 bg-[#a1cdc4]/30 rounded-lg flex items-center justify-center mx-auto mb-3 border border-[#a1cdc4]">
             <Sparkles className="w-6 h-6 text-[#4c4993]" />
@@ -84,7 +121,7 @@ export default function ColumnsView() {
         </div>
       ) : (
         <div className="columns-2 sm:columns-2 lg:columns-3 gap-3 sm:gap-5 space-y-3 sm:space-y-5">
-          {columns.map((col) => (
+          {sortedColumns.map((col) => (
             <div
               key={col.id}
               onClick={() => setSelectedColumnId(col.id)}
@@ -143,11 +180,12 @@ export default function ColumnsView() {
                 </div>
               </div>
 
-              {/* 底部指引 */}
+              {/* 底部指引 (顯示建立日期) */}
               <div className="px-3 py-2 border-t border-[#bfc9eb]/60 bg-[#f4f5f1] flex items-center justify-between text-[10px] sm:text-xs text-[#4c4993]">
-                <span className="font-black font-mono text-[#161348]">
-                  NT$ {(col.totalAmount || 0).toLocaleString()}
-                </span>
+                <div className="flex items-center gap-1 text-[#4c4993]/80 font-mono font-bold">
+                  <Clock className="w-3 h-3 text-[#4c4993]" />
+                  <span>{new Date(col.createdAt || Date.now()).toLocaleDateString()}</span>
+                </div>
                 <ArrowRight className="w-3.5 h-3.5 text-[#4c4993] group-hover:translate-x-1 transition shrink-0" />
               </div>
             </div>
