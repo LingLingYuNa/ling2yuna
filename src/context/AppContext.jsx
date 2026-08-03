@@ -17,8 +17,31 @@ const AppContext = createContext();
 
 export function AppProvider({ children }) {
   const [columns, setColumns] = useState([]);
-  const [selectedColumnId, setSelectedColumnId] = useState(null);
   
+  // ⭐ 網頁重新整理狀態持久化：優先讀取 localStorage 或 URL Hash ⭐
+  const [selectedColumnId, setSelectedColumnIdState] = useState(() => {
+    // 檢查 URL Hash (如 #column/col-123)
+    const hash = window.location.hash;
+    if (hash && hash.startsWith('#column/')) {
+      return hash.replace('#column/', '');
+    }
+    // 檢查 localStorage
+    const savedId = localStorage.getItem('collecttrack_selected_column_id');
+    return savedId === 'HOME' ? null : savedId || null;
+  });
+
+  // 包裝 setSelectedColumnId，同步寫入 localStorage 與 URL Hash
+  const setSelectedColumnId = (id) => {
+    setSelectedColumnIdState(id);
+    if (id) {
+      localStorage.setItem('collecttrack_selected_column_id', id);
+      window.history.replaceState(null, '', `#column/${id}`);
+    } else {
+      localStorage.setItem('collecttrack_selected_column_id', 'HOME');
+      window.history.replaceState(null, '', window.location.pathname);
+    }
+  };
+
   // 當前選取專欄的子資料
   const [columnComments, setColumnComments] = useState([]);
   const [columnImages, setColumnImages] = useState([]);
@@ -34,9 +57,9 @@ export function AppProvider({ children }) {
     try {
       const data = await getAllColumns();
       setColumns(data);
-      if (data.length > 0 && !selectedColumnId) {
-        setSelectedColumnId(data[0].id);
-      } else if (data.length === 0) {
+
+      // 若原先選擇的專欄已不存在於資料庫中，回歸首頁
+      if (selectedColumnId && !data.some(c => c.id === selectedColumnId)) {
         setSelectedColumnId(null);
       }
     } catch (err) {
@@ -102,7 +125,7 @@ export function AppProvider({ children }) {
     const updated = columns.filter(c => c.id !== id);
     setColumns(updated);
     if (selectedColumnId === id) {
-      setSelectedColumnId(updated[0]?.id || null);
+      setSelectedColumnId(null);
     }
   };
 
@@ -134,7 +157,7 @@ export function AppProvider({ children }) {
     setColumnComments(prev => [...prev, newComment]);
   };
 
-  // ⭐ 編輯更新留言記帳 ⭐
+  // 編輯更新留言記帳
   const handleUpdateComment = async (id, newText) => {
     if (!newText || !newText.trim()) return;
     const existing = columnComments.find(c => c.id === id);
