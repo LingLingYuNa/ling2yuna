@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
-import { X, Cloud, Download, Upload, ShieldCheck, Sparkles, FileText, CheckCircle2 } from 'lucide-react';
-import { getAllColumns, getCommentsByColumn, getImagesByColumn, saveColumn, saveComment, saveImage } from '../db/indexedDB';
+import { X, Cloud, Download, Upload, ShieldCheck, Sparkles } from 'lucide-react';
+import { getAllColumns, getCommentsByColumn, getImagesByColumn, saveColumn, saveComment, saveImage, clearAllData } from '../db/indexedDB';
 
 export default function SyncModal({ isOpen, onClose }) {
   const { refreshColumns } = useApp();
@@ -53,13 +53,13 @@ export default function SyncModal({ isOpen, onClose }) {
     }
   };
 
-  // 2. 從 JSON 檔案匯入資料
+  // 2. ⭐ 從 JSON 檔案匯入資料 (先完全清空舊資料再 100% 覆蓋同步) ⭐
   const handleImportJSON = (e) => {
     const file = e.target.files[0];
     if (!file) return;
 
     setIsLoading(true);
-    setStatusMsg('正在解析讀取備份檔並寫入本機資料庫...');
+    setStatusMsg('正在進行清空舊數據並 100% 覆蓋導入...');
 
     const reader = new FileReader();
     reader.onload = async (event) => {
@@ -68,6 +68,9 @@ export default function SyncModal({ isOpen, onClose }) {
         if (!data.columns || !Array.isArray(data.columns)) {
           throw new Error('備份檔格式不正確');
         }
+
+        // ⭐ 關鍵修正：匯入時先完全清空該裝置本機的舊資料，確保 100% 乾淨覆蓋！ ⭐
+        await clearAllData();
 
         for (const col of data.columns) await saveColumn(col);
         if (data.comments && Array.isArray(data.comments)) {
@@ -79,7 +82,7 @@ export default function SyncModal({ isOpen, onClose }) {
 
         await refreshColumns();
         setIsLoading(false);
-        setStatusMsg(`✨ 跨設備匯入成功！已為您還原 ${data.columns.length} 個專欄與完整記帳！`);
+        setStatusMsg(`✨ 覆蓋同步成功！已清空舊資料並還原 ${data.columns.length} 個專欄與完整記帳！`);
       } catch (err) {
         console.error(err);
         setIsLoading(false);
@@ -96,7 +99,7 @@ export default function SyncModal({ isOpen, onClose }) {
         <div className="flex items-center justify-between pb-3 border-b border-[#bfc9eb]/50">
           <div className="flex items-center space-x-2">
             <Cloud className="w-5 h-5 text-[#4c4993]" />
-            <h3 className="font-black text-lg text-[#4c4993]">跨設備資料同步與安全備份</h3>
+            <h3 className="font-black text-lg text-[#4c4993]">跨設備資料覆蓋同步與備份</h3>
           </div>
           <button
             onClick={onClose}
@@ -119,10 +122,10 @@ export default function SyncModal({ isOpen, onClose }) {
           <div className="bg-[#e8ebf7] p-3.5 rounded-md border border-[#bfc9eb] space-y-2">
             <div className="flex items-center space-x-2 text-[#4c4993] font-black text-xs">
               <ShieldCheck className="w-4 h-4 text-[#4c4993]" />
-              <span>為什麼推薦使用 JSON 檔案同步？</span>
+              <span>完全覆蓋同步 (Full Overwrite Sync)</span>
             </div>
             <p className="text-[11px] text-[#4c4993]/90 font-medium leading-relaxed">
-              為了保護您的數據隱私與支援無網存取，CollectTrack 的展圖與圖片都以原生高畫質儲存。由於高畫質圖片檔案大（易超越瀏覽器 5MB 傳輸限制），使用 **「JSON 備份檔」** 傳輸能 100% 保證無損、不卡頓、無限容量地在電腦與手機間完整同步！
+              為了確保跨設備間資料 100% 保持完全一致，匯入 JSON 時將 **會先清空該裝置上的舊紀錄**，再完全覆蓋為電腦備份檔中的最新專欄與記帳！
             </p>
           </div>
 
@@ -153,25 +156,25 @@ export default function SyncModal({ isOpen, onClose }) {
             </button>
           </div>
 
-          {/* 步驟 2: 手機匯入 */}
+          {/* 步驟 2: 手機覆蓋匯入 */}
           <div className="bg-white p-4 rounded-md border border-[#bfc9eb] shadow-xs space-y-3">
             <div className="flex items-center justify-between">
               <span className="text-xs font-black text-[#4c4993] flex items-center gap-1.5">
                 <Upload className="w-4 h-4 text-[#4c4993]" />
-                2. 手機端：匯入 JSON 備份檔
+                2. 手機端：選擇 JSON 檔 (完全清空舊資料並覆蓋)
               </span>
               <span className="text-[10px] text-[#161348] font-black bg-[#a1cdc4] px-2 py-0.5 rounded">
-                一鍵極速還原
+                完全覆蓋還原
               </span>
             </div>
 
             <p className="text-[11px] text-[#4c4993]/80 font-medium">
-              把下載好的 `.json` 檔案經由 Line / 雲端硬碟傳到手機，點擊下方按鈕選擇該檔案即可完成連動：
+              將 `.json` 備份檔傳至手機後，點擊下方選擇檔案，將會自動清空本機舊資料並 100% 覆蓋還原：
             </p>
 
             <label className="w-full bg-[#a1cdc4] hover:bg-[#8ebfb5] text-[#161348] font-black text-xs py-2.5 rounded-md border border-[#a1cdc4] transition flex items-center justify-center gap-2 cursor-pointer shadow-xs">
               <Upload className="w-4 h-4 text-[#161348]" />
-              <span>點此選擇 JSON 備份檔並導入手機</span>
+              <span>點此選擇 JSON 備份檔並覆蓋匯入</span>
               <input type="file" accept=".json" onChange={handleImportJSON} className="hidden" />
             </label>
           </div>
