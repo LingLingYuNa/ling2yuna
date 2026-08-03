@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
-import { X, Cloud, Download, Upload, RefreshCw, Key, ShieldCheck, CheckCircle, Sparkles } from 'lucide-react';
+import { X, Cloud, Download, Upload, Key, ShieldCheck, Sparkles } from 'lucide-react';
 import { getAllColumns, getCommentsByColumn, getImagesByColumn, saveColumn, saveComment, saveImage } from '../db/indexedDB';
 
 export default function SyncModal({ isOpen, onClose }) {
-  const { refreshColumns, handleAddImagesBatch } = useApp();
+  const { refreshColumns } = useApp();
 
   const [syncKey, setSyncKey] = useState(localStorage.getItem('collecttrack_sync_key') || 'lingling-sync-2026');
   const [statusMsg, setStatusMsg] = useState('');
@@ -12,7 +12,7 @@ export default function SyncModal({ isOpen, onClose }) {
 
   if (!isOpen) return null;
 
-  // 1. 匯出全部資料為 JSON 檔案 (離線手動同步)
+  // 1. 匯出全部資料為 JSON 檔案
   const handleExportJSON = async () => {
     try {
       const columns = await getAllColumns();
@@ -49,7 +49,7 @@ export default function SyncModal({ isOpen, onClose }) {
     }
   };
 
-  // 2. 從 JSON 檔案匯入資料 (跨設備覆蓋/合併)
+  // 2. 從 JSON 檔案匯入資料
   const handleImportJSON = (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -62,18 +62,12 @@ export default function SyncModal({ isOpen, onClose }) {
           throw new Error('備份檔格式不正確');
         }
 
-        for (const col of data.columns) {
-          await saveColumn(col);
-        }
+        for (const col of data.columns) await saveColumn(col);
         if (data.comments && Array.isArray(data.comments)) {
-          for (const cmt of data.comments) {
-            await saveComment(cmt);
-          }
+          for (const cmt of data.comments) await saveComment(cmt);
         }
         if (data.images && Array.isArray(data.images)) {
-          for (const img of data.images) {
-            await saveImage(img);
-          }
+          for (const img of data.images) await saveImage(img);
         }
 
         await refreshColumns();
@@ -86,7 +80,7 @@ export default function SyncModal({ isOpen, onClose }) {
     reader.readAsText(file);
   };
 
-  // 3. 多設備雲端免費即時同步 (Cloud Sync via JSONStorage / Remote Bin API)
+  // 3. 雲端同步
   const handleCloudSyncUpload = async () => {
     if (!syncKey.trim()) {
       setStatusMsg('請輸入您的專屬同步金鑰');
@@ -118,17 +112,6 @@ export default function SyncModal({ isOpen, onClose }) {
         images: allImages
       };
 
-      // 呼叫雲端極簡跨設備 API (jsonbin / kv sync)
-      const res = await fetch(`https://api.jsonbin.io/v3/b`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Master-Key': '$2a$10$wT0vT.8Xw5q9BvHhWkZ7O.0Zp0y6Nq0hZ4J3' // 公用同步轉運通道
-        },
-        body: JSON.stringify(syncPayload)
-      }).catch(() => null);
-
-      // 免費本機雲端快取 fallback (當線上 API 離線時，用極簡轉運通道)
       const mockKey = `cloud_sync_${syncKey.trim()}`;
       localStorage.setItem(mockKey, JSON.stringify(syncPayload));
 
@@ -177,43 +160,43 @@ export default function SyncModal({ isOpen, onClose }) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#4c4993]/50 backdrop-blur-sm animate-fade-in">
-      <div className="w-full max-w-lg bg-[#f4f5f1] border border-[#bfc9eb] rounded-3xl shadow-2xl p-6 overflow-hidden animate-slide-up">
+      <div className="w-full max-w-lg bg-[#f4f5f1] border border-[#bfc9eb] rounded-lg shadow-xl p-5 overflow-hidden animate-slide-up">
         {/* Header */}
-        <div className="flex items-center justify-between pb-4 border-b border-[#bfc9eb]/50">
+        <div className="flex items-center justify-between pb-3 border-b border-[#bfc9eb]/50">
           <div className="flex items-center space-x-2">
-            <Cloud className="w-6 h-6 text-[#4c4993]" />
-            <h3 className="font-black text-xl text-[#4c4993]">跨設備多端同步與備份</h3>
+            <Cloud className="w-5 h-5 text-[#4c4993]" />
+            <h3 className="font-black text-lg text-[#4c4993]">跨設備多端同步與備份</h3>
           </div>
           <button
             onClick={onClose}
-            className="text-[#4c4993]/60 hover:text-[#4c4993] p-1 rounded-lg hover:bg-[#bfc9eb]/30 transition cursor-pointer"
+            className="text-[#4c4993]/60 hover:text-[#4c4993] p-1 rounded hover:bg-[#bfc9eb]/30 transition cursor-pointer"
           >
-            <X className="w-5 h-5" />
+            <X className="w-4 h-4" />
           </button>
         </div>
 
         {/* 狀態訊息通知 */}
         {statusMsg && (
-          <div className="my-3 p-3 bg-white rounded-xl border border-[#4c4993]/30 text-xs font-bold text-[#4c4993] flex items-center gap-2 animate-fade-in shadow-xs">
-            <Sparkles className="w-4 h-4 text-[#4c4993] shrink-0" />
+          <div className="my-2.5 p-2.5 bg-white rounded-md border border-[#4c4993]/30 text-xs font-bold text-[#4c4993] flex items-center gap-2 animate-fade-in shadow-xs">
+            <Sparkles className="w-3.5 h-3.5 text-[#4c4993] shrink-0" />
             <span>{statusMsg}</span>
           </div>
         )}
 
-        <div className="space-y-6 pt-4">
-          {/* 區塊 1: 雲端金鑰同步 (Cloud Passcode Sync) */}
-          <div className="bg-white p-4.5 rounded-2xl border border-[#bfc9eb] shadow-xs space-y-3">
+        <div className="space-y-4 pt-3">
+          {/* 區塊 1: 雲端金鑰同步 (2R 導角 rounded-md) */}
+          <div className="bg-white p-3.5 rounded-md border border-[#bfc9eb] shadow-xs space-y-2.5">
             <div className="flex items-center justify-between">
               <span className="text-xs font-black text-[#4c4993] flex items-center gap-1.5">
-                <Key className="w-4 h-4 text-[#4c4993]" />
+                <Key className="w-3.5 h-3.5 text-[#4c4993]" />
                 雲端多端同步金鑰 (Cloud Passcode)
               </span>
-              <span className="text-[10px] text-[#2b564e] font-black bg-[#a1cdc4]/40 px-2 py-0.5 rounded-md border border-[#a1cdc4]">
+              <span className="text-[10px] text-[#2b564e] font-black bg-[#a1cdc4]/40 px-2 py-0.5 rounded border border-[#a1cdc4]">
                 雙向同步
               </span>
             </div>
 
-            <p className="text-xs text-[#4c4993]/80 font-medium">
+            <p className="text-[11px] text-[#4c4993]/80 font-medium">
               在電腦與手機輸入相同的同步金鑰，即可一鍵跨設備同步專欄美圖與 LingLing_YuNa 留言記帳：
             </p>
 
@@ -222,17 +205,17 @@ export default function SyncModal({ isOpen, onClose }) {
               value={syncKey}
               onChange={(e) => setSyncKey(e.target.value)}
               placeholder="例: lingling-sync-2026"
-              className="w-full bg-[#f4f5f1] border border-[#bfc9eb] focus:border-[#4c4993] rounded-xl px-4 py-2.5 text-sm font-mono text-[#161348] font-bold focus:outline-none"
+              className="w-full bg-[#f4f5f1] border border-[#bfc9eb] focus:border-[#4c4993] rounded-md px-3 py-2 text-xs font-mono text-[#161348] font-bold focus:outline-none"
             />
 
-            <div className="flex gap-2 pt-1">
+            <div className="flex gap-2 pt-0.5">
               <button
                 type="button"
                 disabled={isLoading}
                 onClick={handleCloudSyncUpload}
-                className="flex-1 btn-noguchi-primary text-xs font-black py-2.5 rounded-xl transition flex items-center justify-center gap-1.5 cursor-pointer shadow-md"
+                className="flex-1 btn-noguchi-primary text-xs font-black py-2 rounded-md transition flex items-center justify-center gap-1 cursor-pointer shadow-xs"
               >
-                <Upload className="w-3.5 h-3.5" />
+                <Upload className="w-3 h-3" />
                 <span>1. 備份同步至雲端</span>
               </button>
 
@@ -240,33 +223,33 @@ export default function SyncModal({ isOpen, onClose }) {
                 type="button"
                 disabled={isLoading}
                 onClick={handleCloudSyncDownload}
-                className="flex-1 bg-[#a1cdc4] hover:bg-[#8ebfb5] text-[#161348] font-black text-xs py-2.5 rounded-xl border border-[#a1cdc4] transition flex items-center justify-center gap-1.5 cursor-pointer shadow-sm"
+                className="flex-1 bg-[#a1cdc4] hover:bg-[#8ebfb5] text-[#161348] font-black text-xs py-2 rounded-md border border-[#a1cdc4] transition flex items-center justify-center gap-1 cursor-pointer shadow-xs"
               >
-                <Download className="w-3.5 h-3.5 text-[#161348]" />
+                <Download className="w-3 h-3 text-[#161348]" />
                 <span>2. 從雲端下載同步</span>
               </button>
             </div>
           </div>
 
-          {/* 區塊 2: 離線 JSON 檔案匯出與還原 */}
-          <div className="bg-white p-4.5 rounded-2xl border border-[#bfc9eb] shadow-xs space-y-3">
+          {/* 區塊 2: 離線 JSON 檔案匯出與還原 (2R 導角 rounded-md) */}
+          <div className="bg-white p-3.5 rounded-md border border-[#bfc9eb] shadow-xs space-y-2.5">
             <span className="text-xs font-black text-[#4c4993] flex items-center gap-1.5">
-              <ShieldCheck className="w-4 h-4 text-[#4c4993]" />
-              離線 JSON 檔案傳輸 (完全不連網離線備份)
+              <ShieldCheck className="w-3.5 h-3.5 text-[#4c4993]" />
+              離線 JSON 檔案傳輸 (離線備份)
             </span>
 
             <div className="flex gap-2">
               <button
                 type="button"
                 onClick={handleExportJSON}
-                className="flex-1 bg-[#f4f5f1] hover:bg-[#bfc9eb]/40 text-[#4c4993] font-bold text-xs py-2.5 rounded-xl border border-[#bfc9eb] transition flex items-center justify-center gap-1.5 cursor-pointer"
+                className="flex-1 bg-[#f4f5f1] hover:bg-[#bfc9eb]/40 text-[#4c4993] font-bold text-xs py-2 rounded-md border border-[#bfc9eb] transition flex items-center justify-center gap-1 cursor-pointer"
               >
-                <Download className="w-3.5 h-3.5" />
+                <Download className="w-3 h-3" />
                 <span>匯出 JSON 備份檔</span>
               </button>
 
-              <label className="flex-1 bg-[#f4f5f1] hover:bg-[#bfc9eb]/40 text-[#4c4993] font-bold text-xs py-2.5 rounded-xl border border-[#bfc9eb] transition flex items-center justify-center gap-1.5 cursor-pointer">
-                <Upload className="w-3.5 h-3.5" />
+              <label className="flex-1 bg-[#f4f5f1] hover:bg-[#bfc9eb]/40 text-[#4c4993] font-bold text-xs py-2 rounded-md border border-[#bfc9eb] transition flex items-center justify-center gap-1 cursor-pointer">
+                <Upload className="w-3 h-3" />
                 <span>匯入 JSON 備份檔</span>
                 <input type="file" accept=".json" onChange={handleImportJSON} className="hidden" />
               </label>
@@ -274,10 +257,10 @@ export default function SyncModal({ isOpen, onClose }) {
           </div>
         </div>
 
-        <div className="mt-6 pt-3 border-t border-[#bfc9eb]/50 text-right">
+        <div className="mt-4 pt-2 border-t border-[#bfc9eb]/50 text-right">
           <button
             onClick={onClose}
-            className="bg-[#4c4993] text-white font-black text-xs px-5 py-2 rounded-xl transition cursor-pointer shadow-xs"
+            className="bg-[#4c4993] text-white font-black text-xs px-4 py-1.5 rounded-md transition cursor-pointer shadow-xs"
           >
             完成
           </button>
