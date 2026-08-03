@@ -9,6 +9,8 @@ import {
   getImagesByColumn,
   saveImage as dbSaveImage,
   deleteImage as dbDeleteImage,
+  deleteImagesBatch as dbDeleteImagesBatch,
+  deleteAllImagesByColumn as dbDeleteAllImagesByColumn,
   clearAllData
 } from '../db/indexedDB';
 import { parseLedgerComment } from '../utils/ledgerParser';
@@ -18,19 +20,16 @@ const AppContext = createContext();
 export function AppProvider({ children }) {
   const [columns, setColumns] = useState([]);
   
-  // ⭐ 網頁重新整理狀態持久化：優先讀取 localStorage 或 URL Hash ⭐
+  // 網頁重新整理狀態持久化
   const [selectedColumnId, setSelectedColumnIdState] = useState(() => {
-    // 檢查 URL Hash (如 #column/col-123)
     const hash = window.location.hash;
     if (hash && hash.startsWith('#column/')) {
       return hash.replace('#column/', '');
     }
-    // 檢查 localStorage
     const savedId = localStorage.getItem('collecttrack_selected_column_id');
     return savedId === 'HOME' ? null : savedId || null;
   });
 
-  // 包裝 setSelectedColumnId，同步寫入 localStorage 與 URL Hash
   const setSelectedColumnId = (id) => {
     setSelectedColumnIdState(id);
     if (id) {
@@ -58,7 +57,6 @@ export function AppProvider({ children }) {
       const data = await getAllColumns();
       setColumns(data);
 
-      // 若原先選擇的專欄已不存在於資料庫中，回歸首頁
       if (selectedColumnId && !data.some(c => c.id === selectedColumnId)) {
         setSelectedColumnId(null);
       }
@@ -220,12 +218,30 @@ export function AppProvider({ children }) {
     setIsImageModalOpen(false);
   };
 
-  // 刪除照片
+  // 單張刪除照片
   const handleDeleteImage = async (id) => {
     if (!window.confirm('確定要刪除這張展圖嗎？')) return;
     await dbDeleteImage(id);
     setColumnImages(prev => prev.filter(img => img.id !== id));
     if (lightboxImage?.id === id) setLightboxImage(null);
+  };
+
+  // ⭐ 批次一鍵刪除選取的照片 ⭐
+  const handleDeleteImagesBatch = async (ids) => {
+    if (!ids || ids.length === 0) return;
+    if (!window.confirm(`確定要一次刪除已選取的 ${ids.length} 張展圖嗎？此動作無法復原！`)) return;
+    await dbDeleteImagesBatch(ids);
+    setColumnImages(prev => prev.filter(img => !ids.includes(img.id)));
+    if (lightboxImage && ids.includes(lightboxImage.id)) setLightboxImage(null);
+  };
+
+  // ⭐ 一鍵清空目前專欄的所有展圖 ⭐
+  const handleDeleteAllImages = async () => {
+    if (!selectedColumnId || columnImages.length === 0) return;
+    if (!window.confirm(`⚠️ 警告：確定要一鍵刪除此專欄中的所有 ${columnImages.length} 張展圖嗎？（留言記帳不會受到影響）`)) return;
+    await dbDeleteAllImagesByColumn(selectedColumnId);
+    setColumnImages([]);
+    setLightboxImage(null);
   };
 
   // 計算當前專欄留言記帳的總計金額與總件數
@@ -268,6 +284,8 @@ export function AppProvider({ children }) {
         handleAddImage,
         handleAddImagesBatch,
         handleDeleteImage,
+        handleDeleteImagesBatch,
+        handleDeleteAllImages,
         refreshColumns
       }}
     >

@@ -6,13 +6,11 @@ const DB_VERSION = 1;
 export async function initDB() {
   return openDB(DB_NAME, DB_VERSION, {
     upgrade(db) {
-      // 專欄表 (Columns)
       if (!db.objectStoreNames.contains('columns')) {
         const columnStore = db.createObjectStore('columns', { keyPath: 'id' });
         columnStore.createIndex('createdAt', 'createdAt');
       }
 
-      // 專欄/圖片 留言記帳表 (Comments)
       if (!db.objectStoreNames.contains('comments')) {
         const commentStore = db.createObjectStore('comments', { keyPath: 'id' });
         commentStore.createIndex('columnId', 'columnId');
@@ -20,19 +18,16 @@ export async function initDB() {
         commentStore.createIndex('createdAt', 'createdAt');
       }
 
-      // 圖片表 (Images)
       if (!db.objectStoreNames.contains('images')) {
         const imageStore = db.createObjectStore('images', { keyPath: 'id' });
         imageStore.createIndex('columnId', 'columnId');
       }
 
-      // 週邊訂單表 (Orders)
       if (!db.objectStoreNames.contains('orders')) {
         const orderStore = db.createObjectStore('orders', { keyPath: 'id' });
         orderStore.createIndex('createdAt', 'createdAt');
       }
 
-      // 生活極簡記帳 (SimpleLedger)
       if (!db.objectStoreNames.contains('simpleLedger')) {
         const ledgerStore = db.createObjectStore('simpleLedger', { keyPath: 'id' });
         ledgerStore.createIndex('date', 'date');
@@ -40,11 +35,6 @@ export async function initDB() {
     },
   });
 }
-
-// 內建設定/預設資料全部清空 (用戶乾淨初始狀態)
-export const initialColumnsData = [];
-export const initialCommentsData = [];
-export const initialImagesData = [];
 
 // 完全清空本地資料庫中現有的所有 Demo 與記錄
 export async function clearAllData() {
@@ -63,7 +53,6 @@ export async function getAllColumns() {
   const db = await initDB();
   const list = await db.getAll('columns');
 
-  // 為每一個專欄計算當前留言記帳總花費
   const listWithTotals = await Promise.all(
     list.map(async (col) => {
       const comments = await db.getAllFromIndex('comments', 'columnId', col.id);
@@ -90,7 +79,6 @@ export async function saveColumn(column) {
 export async function deleteColumn(id) {
   const db = await initDB();
   await db.delete('columns', id);
-  // 同時刪除關聯圖片與留言
   const tx = db.transaction(['images', 'comments'], 'readwrite');
   const imageStore = tx.objectStore('images');
   const commentStore = tx.objectStore('comments');
@@ -136,4 +124,27 @@ export async function saveImage(image) {
 export async function deleteImage(id) {
   const db = await initDB();
   await db.delete('images', id);
+}
+
+// ⭐ 批次一鍵刪除多張展圖 ⭐
+export async function deleteImagesBatch(ids) {
+  const db = await initDB();
+  const tx = db.transaction('images', 'readwrite');
+  const imageStore = tx.objectStore('images');
+  for (const id of ids) {
+    await imageStore.delete(id);
+  }
+  await tx.done;
+}
+
+// ⭐ 一鍵清空特定專欄下的所有展圖 ⭐
+export async function deleteAllImagesByColumn(columnId) {
+  const db = await initDB();
+  const tx = db.transaction('images', 'readwrite');
+  const imageStore = tx.objectStore('images');
+  const images = await imageStore.index('columnId').getAll(columnId);
+  for (const img of images) {
+    await imageStore.delete(img.id);
+  }
+  await tx.done;
 }

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import CommentLedger from '../components/CommentLedger';
-import { ArrowLeft, Plus, Image as ImageIcon, Edit3, Trash2, Maximize2, Calculator, ChevronUp, ChevronDown } from 'lucide-react';
+import { ArrowLeft, Plus, Image as ImageIcon, Edit3, Trash2, Maximize2, Calculator, ChevronUp, ChevronDown, CheckSquare, Square, AlertTriangle } from 'lucide-react';
 
 export default function ColumnDetailView() {
   const {
@@ -15,11 +15,17 @@ export default function ColumnDetailView() {
     setLightboxImage,
     setIsColumnModalOpen,
     setEditingColumn,
-    handleDeleteColumn
+    handleDeleteColumn,
+    handleDeleteImagesBatch,
+    handleDeleteAllImages
   } = useApp();
 
-  // 專欄最上方的專欄介紹摺疊狀態 (預設摺疊收合，節省螢幕空間)
+  // 專欄最上方的專欄介紹摺疊狀態 (預設摺疊收合)
   const [isHeaderCollapsed, setIsHeaderCollapsed] = useState(true);
+
+  // ⭐ 展圖批次選擇刪除模式 ⭐
+  const [isSelectMode, setIsSelectMode] = useState(false);
+  const [selectedImageIds, setSelectedImageIds] = useState([]);
 
   if (!currentColumn) {
     return (
@@ -32,6 +38,30 @@ export default function ColumnDetailView() {
   const handleEdit = () => {
     setEditingColumn(currentColumn);
     setIsColumnModalOpen(true);
+  };
+
+  // 切換單張圖片勾選狀態
+  const toggleImageSelect = (id) => {
+    setSelectedImageIds((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
+    );
+  };
+
+  // 全選或取消全選
+  const toggleSelectAll = () => {
+    if (selectedImageIds.length === columnImages.length) {
+      setSelectedImageIds([]);
+    } else {
+      setSelectedImageIds(columnImages.map((img) => img.id));
+    }
+  };
+
+  // 執行批次勾選刪除
+  const executeBatchDelete = async () => {
+    if (selectedImageIds.length === 0) return;
+    await handleDeleteImagesBatch(selectedImageIds);
+    setSelectedImageIds([]);
+    setIsSelectMode(false);
   };
 
   return (
@@ -85,7 +115,7 @@ export default function ColumnDetailView() {
 
       {/* 專欄 Hero 標題區 (2R 俐落微圓角 rounded-lg) */}
       <div className="relative rounded-lg overflow-hidden border border-[#4c4993]/30 bg-[#1f1b63] shadow-md transition-all duration-200">
-        {/* 折疊狀態 (Micro Bar) */}
+        {/* 折疊狀態 */}
         {isHeaderCollapsed ? (
           <div
             onClick={() => setIsHeaderCollapsed(false)}
@@ -186,21 +216,76 @@ export default function ColumnDetailView() {
 
         {/* 區塊 2：專欄展圖藝廊 (手機版: 在下方 / 電腦版: 在左側 lg:col-span-7 lg:order-1) */}
         <div className="lg:col-span-7 lg:order-1 w-full space-y-3 sm:space-y-4">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-wrap items-center justify-between gap-2">
             <h2 className="font-black text-base text-[#4c4993] flex items-center gap-2">
               <ImageIcon className="w-4 h-4 text-[#4c4993]" />
               專欄展圖藝廊 ({columnImages.length} 張)
             </h2>
-            <button
-              onClick={() => setIsImageModalOpen(true)}
-              className="bg-[#f4f5f1] hover:bg-white text-[#4c4993] text-xs font-extrabold px-3 py-1.5 rounded-lg border border-[#4c4993]/40 transition flex items-center gap-1 cursor-pointer shadow-xs"
-            >
-              <Plus className="w-3.5 h-3.5 text-[#4c4993]" />
-              <span>新增美圖</span>
-            </button>
+
+            {/* ⭐ 一鍵刪除展圖 & 批次選擇刪除工具列 ⭐ */}
+            <div className="flex items-center space-x-2">
+              {columnImages.length > 0 && (
+                <>
+                  {isSelectMode ? (
+                    <div className="flex items-center space-x-1.5 animate-fade-in">
+                      <button
+                        onClick={toggleSelectAll}
+                        className="text-[11px] font-bold text-[#4c4993] bg-[#f4f5f1] hover:bg-white px-2.5 py-1.5 rounded-lg border border-[#4c4993]/30 transition cursor-pointer"
+                      >
+                        {selectedImageIds.length === columnImages.length ? '取消全選' : '全選'}
+                      </button>
+
+                      <button
+                        onClick={executeBatchDelete}
+                        disabled={selectedImageIds.length === 0}
+                        className="text-[11px] font-black text-white bg-red-600 hover:bg-red-700 disabled:opacity-50 px-3 py-1.5 rounded-lg transition flex items-center gap-1 cursor-pointer shadow-xs"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        <span>刪除已選 ({selectedImageIds.length})</span>
+                      </button>
+
+                      <button
+                        onClick={() => { setIsSelectMode(false); setSelectedImageIds([]); }}
+                        className="text-[11px] font-bold text-[#4c4993]/70 hover:text-[#4c4993] px-2 py-1.5 rounded-lg transition cursor-pointer"
+                      >
+                        取消
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex items-center space-x-1.5">
+                      <button
+                        onClick={() => setIsSelectMode(true)}
+                        className="bg-[#f4f5f1] hover:bg-white text-[#4c4993] text-xs font-bold px-2.5 py-1.5 rounded-lg border border-[#4c4993]/30 transition flex items-center gap-1 cursor-pointer shadow-xs"
+                        title="勾選多張照片一鍵批量刪除"
+                      >
+                        <CheckSquare className="w-3.5 h-3.5 text-[#4c4993]" />
+                        <span className="hidden sm:inline">批次選取刪除</span>
+                      </button>
+
+                      <button
+                        onClick={handleDeleteAllImages}
+                        className="bg-red-50 hover:bg-red-100 text-red-700 text-xs font-bold px-2.5 py-1.5 rounded-lg border border-red-300 transition flex items-center gap-1 cursor-pointer shadow-xs"
+                        title="一鍵清空本專欄下的所有展圖"
+                      >
+                        <Trash2 className="w-3.5 h-3.5 text-red-600" />
+                        <span className="hidden sm:inline">一鍵清空展圖</span>
+                      </button>
+                    </div>
+                  )}
+                </>
+              )}
+
+              <button
+                onClick={() => setIsImageModalOpen(true)}
+                className="bg-[#f4f5f1] hover:bg-white text-[#4c4993] text-xs font-extrabold px-3 py-1.5 rounded-lg border border-[#4c4993]/40 transition flex items-center gap-1 cursor-pointer shadow-xs"
+              >
+                <Plus className="w-3.5 h-3.5 text-[#4c4993]" />
+                <span>新增美圖</span>
+              </button>
+            </div>
           </div>
 
-          {/* ⭐ 展圖藝廊：改用 Row-First CSS Grid (grid-cols-2 lg:grid-cols-3)，確保照片閱讀順序為左 1、右 2、下左 3、下右 4！ ⭐ */}
+          {/* 展圖藝廊：Row-First CSS Grid (grid-cols-2 lg:grid-cols-3)，支援勾選模式 */}
           {columnImages.length === 0 ? (
             <div className="bg-[#f4f5f1] rounded-lg p-8 text-center border border-dashed border-[#4c4993]/40">
               <ImageIcon className="w-10 h-10 text-[#4c4993]/50 mx-auto mb-2" />
@@ -209,32 +294,62 @@ export default function ColumnDetailView() {
             </div>
           ) : (
             <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 items-start">
-              {columnImages.map((img) => (
-                <div
-                  key={img.id}
-                  onClick={() => setLightboxImage(img)}
-                  className="group relative rounded-lg overflow-hidden border border-[#4c4993]/30 bg-white cursor-pointer hover:border-[#4c4993] transition shadow-xs hover:shadow-md"
-                >
-                  <img
-                    src={img.url}
-                    alt={img.caption || '專欄展圖'}
-                    className="w-full h-auto block object-contain rounded-lg group-hover:scale-[1.02] transition duration-300"
-                  />
+              {columnImages.map((img) => {
+                const isSelected = selectedImageIds.includes(img.id);
 
-                  <div className="absolute inset-0 bg-gradient-to-t from-[#161348]/90 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition p-2.5 flex flex-col justify-between">
-                    <div className="self-end">
-                      <span className="p-1.5 bg-[#f4f5f1] rounded-md text-[#161348] font-bold inline-block shadow-xs">
-                        <Maximize2 className="w-3.5 h-3.5" />
-                      </span>
-                    </div>
-                    <div>
-                      <p className="text-white font-bold text-[10px] sm:text-xs line-clamp-2">
-                        {img.caption || '點擊放大全螢幕檢視'}
-                      </p>
-                    </div>
+                return (
+                  <div
+                    key={img.id}
+                    onClick={() => {
+                      if (isSelectMode) {
+                        toggleImageSelect(img.id);
+                      } else {
+                        setLightboxImage(img);
+                      }
+                    }}
+                    className={`group relative rounded-lg overflow-hidden border transition shadow-xs hover:shadow-md cursor-pointer ${
+                      isSelectMode && isSelected
+                        ? 'border-red-600 ring-2 ring-red-400 bg-red-50'
+                        : 'border-[#4c4993]/30 bg-white hover:border-[#4c4993]'
+                    }`}
+                  >
+                    <img
+                      src={img.url}
+                      alt={img.caption || '專欄展圖'}
+                      className="w-full h-auto block object-contain rounded-lg group-hover:scale-[1.02] transition duration-300"
+                    />
+
+                    {/* 批次選取模式下的 Checkbox 勾選層 */}
+                    {isSelectMode ? (
+                      <div className="absolute top-2 right-2 z-20">
+                        {isSelected ? (
+                          <div className="p-1 bg-red-600 text-white rounded-md shadow-md">
+                            <CheckSquare className="w-4 h-4" />
+                          </div>
+                        ) : (
+                          <div className="p-1 bg-black/40 text-white/80 rounded-md shadow-md">
+                            <Square className="w-4 h-4" />
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      /* 一般模式下 hover 出現的放大圖示 */
+                      <div className="absolute inset-0 bg-gradient-to-t from-[#161348]/90 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition p-2.5 flex flex-col justify-between">
+                        <div className="self-end">
+                          <span className="p-1.5 bg-[#f4f5f1] rounded-md text-[#161348] font-bold inline-block shadow-xs">
+                            <Maximize2 className="w-3.5 h-3.5" />
+                          </span>
+                        </div>
+                        <div>
+                          <p className="text-white font-bold text-[10px] sm:text-xs line-clamp-2">
+                            {img.caption || '點擊放大全螢幕檢視'}
+                          </p>
+                        </div>
+                      </div>
+                    )}
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
