@@ -1,10 +1,12 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import ColumnDetailView from './ColumnDetailView';
-import { Plus, FolderHeart, ArrowRight, MessageSquare, Sparkles, Image as ImageIcon, Calculator } from 'lucide-react';
+import ExcelImportModal from '../components/ExcelImportModal';
+import { Plus, FolderHeart, ArrowRight, Sparkles, Image as ImageIcon, FileSpreadsheet } from 'lucide-react';
 
 export default function ColumnsView() {
   const { columns, selectedColumnId, setSelectedColumnId, setIsColumnModalOpen, setEditingColumn } = useApp();
+  const [isExcelModalOpen, setIsExcelModalOpen] = useState(false);
 
   if (selectedColumnId) {
     return <ColumnDetailView />;
@@ -26,16 +28,28 @@ export default function ColumnsView() {
           </p>
         </div>
 
-        <button
-          onClick={() => {
-            setEditingColumn(null);
-            setIsColumnModalOpen(true);
-          }}
-          className="btn-noguchi-primary font-black text-xs px-4 py-2 rounded-lg transition flex items-center justify-center gap-1.5 cursor-pointer self-start sm:self-auto shadow-xs"
-        >
-          <Plus className="w-4 h-4 text-white" />
-          <span>建立展示專欄</span>
-        </button>
+        {/* 動作按鈕區: 建立專欄 & Excel 匯入 */}
+        <div className="flex items-center space-x-2 self-start sm:self-auto">
+          <button
+            onClick={() => setIsExcelModalOpen(true)}
+            className="bg-[#f4f5f1] hover:bg-white text-[#4c4993] font-black text-xs px-3.5 py-2 rounded-lg border border-[#4c4993]/30 transition flex items-center gap-1.5 cursor-pointer shadow-xs"
+            title="從 Excel (.xlsx, .csv) 批量匯入專欄"
+          >
+            <FileSpreadsheet className="w-4 h-4 text-[#4c4993]" />
+            <span>Excel 匯入</span>
+          </button>
+
+          <button
+            onClick={() => {
+              setEditingColumn(null);
+              setIsColumnModalOpen(true);
+            }}
+            className="btn-noguchi-primary font-black text-xs px-4 py-2 rounded-lg transition flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
+          >
+            <Plus className="w-4 h-4 text-white" />
+            <span>建立展示專欄</span>
+          </button>
+        </div>
       </div>
 
       {/* 專欄列表網格 (手機版雙欄 2R 俐落微圓角 8px) */}
@@ -46,18 +60,27 @@ export default function ColumnsView() {
           </div>
           <h3 className="text-base font-black text-[#4c4993] mb-1.5">專欄牆目前尚無資料</h3>
           <p className="text-xs text-[#4c4993] font-bold max-w-md mx-auto mb-5">
-            點擊下方「建立第一個專欄」開始新增您的第一個主題展示牆，上傳宣圖美圖並體驗隨手留言記帳！
+            點擊下方「建立第一個專欄」或「Excel 匯入」開始新增您的第一個主題展示牆！
           </p>
-          <button
-            onClick={() => {
-              setEditingColumn(null);
-              setIsColumnModalOpen(true);
-            }}
-            className="btn-noguchi-primary font-black text-xs px-5 py-2.5 rounded-lg transition inline-flex items-center gap-2 shadow-xs cursor-pointer"
-          >
-            <Plus className="w-4 h-4 text-white" />
-            <span>建立第一個專欄</span>
-          </button>
+          <div className="flex items-center justify-center gap-2">
+            <button
+              onClick={() => setIsExcelModalOpen(true)}
+              className="bg-[#f4f5f1] hover:bg-white text-[#4c4993] font-black text-xs px-4 py-2.5 rounded-lg border border-[#4c4993]/30 transition inline-flex items-center gap-1.5 shadow-xs cursor-pointer"
+            >
+              <FileSpreadsheet className="w-4 h-4 text-[#4c4993]" />
+              <span>Excel 批量匯入</span>
+            </button>
+            <button
+              onClick={() => {
+                setEditingColumn(null);
+                setIsColumnModalOpen(true);
+              }}
+              className="btn-noguchi-primary font-black text-xs px-5 py-2.5 rounded-lg transition inline-flex items-center gap-2 shadow-xs cursor-pointer"
+            >
+              <Plus className="w-4 h-4 text-white" />
+              <span>建立第一個專欄</span>
+            </button>
+          </div>
         </div>
       ) : (
         <div className="columns-2 sm:columns-2 lg:columns-3 gap-3 sm:gap-5 space-y-3 sm:space-y-5">
@@ -68,7 +91,7 @@ export default function ColumnsView() {
               className="break-inside-avoid group glass-card rounded-lg overflow-hidden cursor-pointer transition-all duration-200 hover:-translate-y-0.5 flex flex-col justify-between mb-3 sm:mb-5"
             >
               <div>
-                {/* 封面圖 (保留原圖尺寸比例, 2R 頂部平貼) */}
+                {/* 封面圖 */}
                 <div className="w-full relative overflow-hidden bg-[#e8ebf7] min-h-[110px] flex items-center justify-center">
                   {col.coverImage ? (
                     <img
@@ -83,14 +106,14 @@ export default function ColumnsView() {
                     </div>
                   )}
 
-                  {/* 頂部左側：分類標籤 (2R 導角) */}
+                  {/* 頂部左側：分類標籤 */}
                   <div className="absolute top-2 left-2">
                     <span className="text-[10px] font-black px-2 py-0.5 rounded bg-[#4c4993] text-white shadow-xs border border-white/40">
                       {col.category}
                     </span>
                   </div>
 
-                  {/* 頂部右側：目前總花費 (2R 導角) */}
+                  {/* 頂部右側：目前總花費 */}
                   <div className="absolute top-2 right-2">
                     <span className="text-[10px] font-black px-2 py-0.5 rounded bg-[#a1cdc4] text-[#161348] shadow-xs border border-white/60 font-mono flex items-center gap-1">
                       NT$ {(col.totalAmount || 0).toLocaleString()}
@@ -131,6 +154,9 @@ export default function ColumnsView() {
           ))}
         </div>
       )}
+
+      {/* Excel 匯入 Modal */}
+      <ExcelImportModal isOpen={isExcelModalOpen} onClose={() => setIsExcelModalOpen(false)} />
     </div>
   );
 }
