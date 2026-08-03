@@ -2,14 +2,14 @@ import React, { useState, useMemo, useLayoutEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import ColumnDetailView from './ColumnDetailView';
 import ExcelImportModal from '../components/ExcelImportModal';
-import { Plus, FolderHeart, ArrowRight, Sparkles, Image as ImageIcon, FileSpreadsheet, ArrowUpDown, Clock } from 'lucide-react';
+import { Plus, FolderHeart, ArrowRight, Sparkles, Image as ImageIcon, FileSpreadsheet, ArrowUpDown, Clock, RefreshCw } from 'lucide-react';
 
 export default function ColumnsView() {
   const { columns, selectedColumnId, setSelectedColumnId, setIsColumnModalOpen, setEditingColumn } = useApp();
   const [isExcelModalOpen, setIsExcelModalOpen] = useState(false);
 
-  // 專欄時間與花費排序模式
-  const [sortBy, setSortBy] = useState('newest');
+  // 專欄排序模式：預設以內容更新時間 (updated_desc) 排序！
+  const [sortBy, setSortBy] = useState('updated_desc');
 
   // 自動恢復回到上一頁時的滾動位置
   useLayoutEffect(() => {
@@ -31,7 +31,15 @@ export default function ColumnsView() {
     if (!columns || columns.length === 0) return [];
     
     return [...columns].sort((a, b) => {
-      if (sortBy === 'newest') {
+      if (sortBy === 'updated_desc') {
+        const timeA = new Date(a.updatedAt || a.createdAt || 0).getTime();
+        const timeB = new Date(b.updatedAt || b.createdAt || 0).getTime();
+        return timeB - timeA;
+      } else if (sortBy === 'updated_asc') {
+        const timeA = new Date(a.updatedAt || a.createdAt || 0).getTime();
+        const timeB = new Date(b.updatedAt || b.createdAt || 0).getTime();
+        return timeA - timeB;
+      } else if (sortBy === 'newest') {
         return new Date(b.createdAt || 0) - new Date(a.createdAt || 0);
       } else if (sortBy === 'oldest') {
         return new Date(a.createdAt || 0) - new Date(b.createdAt || 0);
@@ -64,9 +72,9 @@ export default function ColumnsView() {
           </p>
         </div>
 
-        {/* 動作按鈕區 */}
+        {/* 動作按鈕區: 動態排序切換選單 */}
         <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
-          <div className="relative inline-flex items-center bg-[#f4f5f1] border border-[#4c4993]/30 rounded-lg px-2.5 py-1.5 shadow-xs">
+          <div className="relative inline-flex items-center bg-[#f4f5f1] border border-[#4c4993]/40 rounded-lg px-2.5 py-1.5 shadow-xs">
             <ArrowUpDown className="w-3.5 h-3.5 text-[#4c4993] mr-1.5 shrink-0" />
             <span className="text-[11px] font-black text-[#4c4993] mr-1 hidden sm:inline">排序:</span>
             <select
@@ -74,8 +82,10 @@ export default function ColumnsView() {
               onChange={(e) => setSortBy(e.target.value)}
               className="bg-transparent text-xs font-extrabold text-[#161348] focus:outline-none cursor-pointer pr-1"
             >
-              <option value="newest">🕒 時間：由新到舊 (最新建立)</option>
-              <option value="oldest">⏳ 時間：由舊到新 (最早建立)</option>
+              <option value="updated_desc">🔄 內容更新時間：由新到舊 (最新有動態)</option>
+              <option value="updated_asc">⌛ 內容更新時間：由舊到新</option>
+              <option value="newest">🕒 專欄建立時間：由新到舊</option>
+              <option value="oldest">⏳ 專欄建立時間：由舊到新</option>
               <option value="amount_desc">💰 依花費金額：高到低</option>
               <option value="name">🔤 依專欄名稱字典序</option>
             </select>
@@ -103,7 +113,7 @@ export default function ColumnsView() {
         </div>
       </div>
 
-      {/* ⭐ 嚴格左一右二橫向 Row-First CSS Grid (grid-cols-2 lg:grid-cols-3) ⭐ */}
+      {/* 嚴格左一右二橫向 Row-First CSS Grid (grid-cols-2 lg:grid-cols-3) */}
       {sortedColumns.length === 0 ? (
         <div className="bg-[#f4f5f1] rounded-lg p-10 text-center border-2 border-dashed border-[#bfc9eb] shadow-xs">
           <div className="w-12 h-12 bg-[#a1cdc4]/30 rounded-lg flex items-center justify-center mx-auto mb-3 border border-[#a1cdc4]">
@@ -194,11 +204,11 @@ export default function ColumnsView() {
                 </div>
               </div>
 
-              {/* 底部指引 */}
+              {/* 底部指引：顯示內容更新時間或建立時間 */}
               <div className="px-3 py-2 border-t border-[#bfc9eb]/60 bg-[#f4f5f1] flex items-center justify-between text-[10px] sm:text-xs text-[#4c4993] mt-auto">
-                <div className="flex items-center gap-1 text-[#4c4993]/80 font-mono font-bold">
-                  <Clock className="w-3 h-3 text-[#4c4993]" />
-                  <span>{new Date(col.createdAt || Date.now()).toLocaleDateString()}</span>
+                <div className="flex items-center gap-1 text-[#4c4993]/80 font-mono font-bold" title="內容最後更新時間">
+                  <RefreshCw className="w-3 h-3 text-[#4c4993]" />
+                  <span>{new Date(col.updatedAt || col.createdAt || Date.now()).toLocaleDateString()}</span>
                 </div>
                 <ArrowRight className="w-3.5 h-3.5 text-[#4c4993] group-hover:translate-x-1 transition shrink-0" />
               </div>

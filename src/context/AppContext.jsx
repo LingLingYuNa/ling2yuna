@@ -33,7 +33,6 @@ export function AppProvider({ children }) {
   // 包裝 setSelectedColumnId，在離開總覽頁時自動紀錄當前的滾動高度 scrollY
   const setSelectedColumnId = (id) => {
     if (id) {
-      // 點擊進入專欄時，記錄當前總覽牆的垂直滾動高度
       sessionStorage.setItem('collecttrack_scroll_pos', window.scrollY.toString());
       localStorage.setItem('collecttrack_selected_column_id', id);
       window.history.replaceState(null, '', `#column/${id}`);
@@ -72,6 +71,19 @@ export function AppProvider({ children }) {
     refreshColumns();
   }, []);
 
+  // 輔助函式：觸發指定專欄的 updatedAt 時間戳記更新
+  const touchColumnUpdatedAt = async (colId) => {
+    const target = columns.find(c => c.id === colId);
+    if (!target) return;
+    const now = new Date().toISOString();
+    const updatedCol = {
+      ...target,
+      updatedAt: now
+    };
+    await saveColumn(updatedCol);
+    setColumns(prev => prev.map(c => (c.id === colId ? updatedCol : c)));
+  };
+
   // 當選擇的專欄變更時，載入關聯的留言記帳與照片
   useEffect(() => {
     if (!selectedColumnId) {
@@ -103,6 +115,7 @@ export function AppProvider({ children }) {
   // 新增或更新專欄
   const handleSaveColumn = async (columnData) => {
     const isEdit = !!columnData.id;
+    const now = new Date().toISOString();
     const newCol = {
       id: columnData.id || `col-${Date.now()}`,
       title: columnData.title || '無標題專欄',
@@ -110,7 +123,8 @@ export function AppProvider({ children }) {
       category: columnData.category || '宣圖',
       coverImage: columnData.coverImage || '',
       tags: columnData.tags || [],
-      createdAt: columnData.createdAt || new Date().toISOString()
+      createdAt: columnData.createdAt || now,
+      updatedAt: now
     };
     await saveColumn(newCol);
     await refreshColumns();
@@ -140,7 +154,7 @@ export function AppProvider({ children }) {
     setColumnImages([]);
   };
 
-  // 新增留言記帳
+  // 新增留言記帳 (自動觸發 updatedAt)
   const handleAddComment = async (text, author = 'LingLing_YuNa') => {
     if (!text || !text.trim() || !selectedColumnId) return;
     const parsed = parseLedgerComment(text);
@@ -156,9 +170,10 @@ export function AppProvider({ children }) {
 
     await dbSaveComment(newComment);
     setColumnComments(prev => [...prev, newComment]);
+    await touchColumnUpdatedAt(selectedColumnId);
   };
 
-  // 編輯更新留言記帳
+  // 編輯更新留言記帳 (自動觸發 updatedAt)
   const handleUpdateComment = async (id, newText) => {
     if (!newText || !newText.trim()) return;
     const existing = columnComments.find(c => c.id === id);
@@ -174,15 +189,17 @@ export function AppProvider({ children }) {
 
     await dbSaveComment(updatedComment);
     setColumnComments(prev => prev.map(c => (c.id === id ? updatedComment : c)));
+    await touchColumnUpdatedAt(selectedColumnId);
   };
 
-  // 刪除留言記帳
+  // 刪除留言記帳 (自動觸發 updatedAt)
   const handleDeleteComment = async (id) => {
     await dbDeleteComment(id);
     setColumnComments(prev => prev.filter(c => c.id !== id));
+    if (selectedColumnId) await touchColumnUpdatedAt(selectedColumnId);
   };
 
-  // 單張新增照片
+  // 單張新增照片 (自動觸發 updatedAt)
   const handleAddImage = async (url, caption) => {
     if (!url || !selectedColumnId) return;
     const newImg = {
@@ -195,9 +212,10 @@ export function AppProvider({ children }) {
     await dbSaveImage(newImg);
     setColumnImages(prev => [newImg, ...prev]);
     setIsImageModalOpen(false);
+    await touchColumnUpdatedAt(selectedColumnId);
   };
 
-  // 批量新增照片
+  // 批量新增照片 (自動觸發 updatedAt)
   const handleAddImagesBatch = async (imagesList) => {
     if (!imagesList || imagesList.length === 0 || !selectedColumnId) return;
     
@@ -219,32 +237,36 @@ export function AppProvider({ children }) {
 
     setColumnImages(prev => [...newImages, ...prev]);
     setIsImageModalOpen(false);
+    await touchColumnUpdatedAt(selectedColumnId);
   };
 
-  // 單張刪除照片
+  // 單張刪除照片 (自動觸發 updatedAt)
   const handleDeleteImage = async (id) => {
     if (!window.confirm('確定要刪除這張展圖嗎？')) return;
     await dbDeleteImage(id);
     setColumnImages(prev => prev.filter(img => img.id !== id));
     if (lightboxImage?.id === id) setLightboxImage(null);
+    if (selectedColumnId) await touchColumnUpdatedAt(selectedColumnId);
   };
 
-  // 批次一鍵刪除選取的照片
+  // 批次一鍵刪除選取的照片 (自動觸發 updatedAt)
   const handleDeleteImagesBatch = async (ids) => {
     if (!ids || ids.length === 0) return;
     if (!window.confirm(`確定要一次刪除已選取的 ${ids.length} 張展圖嗎？此動作無法復原！`)) return;
     await dbDeleteImagesBatch(ids);
     setColumnImages(prev => prev.filter(img => !ids.includes(img.id)));
     if (lightboxImage && ids.includes(lightboxImage.id)) setLightboxImage(null);
+    if (selectedColumnId) await touchColumnUpdatedAt(selectedColumnId);
   };
 
-  // 一鍵清空目前專欄的所有展圖
+  // 一鍵清空目前專欄的所有展圖 (自動觸發 updatedAt)
   const handleDeleteAllImages = async () => {
     if (!selectedColumnId || columnImages.length === 0) return;
     if (!window.confirm(`⚠️ 警告：確定要一鍵刪除此專欄中的所有 ${columnImages.length} 張展圖嗎？（留言記帳不會受到影響）`)) return;
     await dbDeleteAllImagesByColumn(selectedColumnId);
     setColumnImages([]);
     setLightboxImage(null);
+    await touchColumnUpdatedAt(selectedColumnId);
   };
 
   // 計算當前專欄留言記帳的總計金額與總件數
