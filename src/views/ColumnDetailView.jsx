@@ -207,7 +207,7 @@ export default function ColumnDetailView() {
           <CommentLedger />
         </div>
 
-        {/* 區塊 2：專欄展圖藝廊 (使用經典 Pinterest 真瀑布流 columns-2 sm:columns-2 lg:columns-3 保留圖片原有比例) */}
+        {/* 區塊 2：專欄展圖藝廊 (使用嚴格左一右二 CSS Grid grid-cols-2 lg:grid-cols-3) */}
         <div className="lg:col-span-7 lg:order-1 w-full space-y-3 sm:space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <h2 className="font-black text-base text-[#4c4993] flex items-center gap-2">
@@ -277,7 +277,7 @@ export default function ColumnDetailView() {
             </div>
           </div>
 
-          {/* ⭐ 經典 Pinterest 瀑布流展示 (columns-2 sm:columns-2 lg:columns-3)，完美保留照片原有的長寬比例！ ⭐ */}
+          {/* ⭐ 嚴格左一右二 Row-First CSS Grid (grid-cols-2 lg:grid-cols-3) ⭐ */}
           {columnImages.length === 0 ? (
             <div className="bg-[#f4f5f1] rounded-lg p-8 text-center border border-dashed border-[#4c4993]/40">
               <ImageIcon className="w-10 h-10 text-[#4c4993]/50 mx-auto mb-2" />
@@ -285,7 +285,7 @@ export default function ColumnDetailView() {
               <p className="text-[11px] text-[#4c4993]/70 font-semibold mt-1">點擊上方「新增美圖」批量上傳宣圖或插畫照片</p>
             </div>
           ) : (
-            <div className="columns-2 sm:columns-2 lg:columns-3 gap-3 sm:gap-4 space-y-3 sm:space-y-4">
+            <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 items-start">
               {columnImages.map((img) => {
                 const isSelected = selectedImageIds.includes(img.id);
 
@@ -299,13 +299,13 @@ export default function ColumnDetailView() {
                         setLightboxImage(img);
                       }
                     }}
-                    className={`break-inside-avoid group relative rounded-lg overflow-hidden border transition shadow-xs hover:shadow-md cursor-pointer mb-3 sm:mb-4 ${
+                    className={`group relative rounded-lg overflow-hidden border transition shadow-xs hover:shadow-md cursor-pointer ${
                       isSelectMode && isSelected
                         ? 'border-red-600 ring-2 ring-red-400 bg-red-50'
                         : 'border-[#4c4993]/30 bg-white hover:border-[#4c4993]'
                     }`}
                   >
-                    {/* 100% 自然原圖長寬比例，絕不硬性裁切 */}
+                    {/* 保留原圖比例 */}
                     <img
                       src={img.url}
                       alt={img.caption || '專欄展圖'}
