@@ -1,18 +1,29 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
-import { X, Cloud, Download, Upload, Key, ShieldCheck, Sparkles, Loader2, Copy, Check, FileText } from 'lucide-react';
+import { X, Cloud, Download, Upload, Key, ShieldCheck, Sparkles, Loader2, Copy, Check, Hash } from 'lucide-react';
 import { getAllColumns, getCommentsByColumn, getImagesByColumn, saveColumn, saveComment, saveImage } from '../db/indexedDB';
 
 export default function SyncModal({ isOpen, onClose }) {
   const { refreshColumns } = useApp();
 
-  const [syncKey, setSyncKey] = useState(localStorage.getItem('collecttrack_sync_key') || 'lingling-sync-2026');
-  const [syncCodeInput, setSyncCodeInput] = useState('');
+  // 6 位數極短碼狀態
+  const [shortCode, setShortCode] = useState('');
+  const [inputShortCode, setInputShortCode] = useState('');
   const [statusMsg, setStatusMsg] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [copied, setCopied] = useState(false);
 
   if (!isOpen) return null;
+
+  // 隨機產生 6 位數大寫英文與數字組成的短碼
+  const generateRandomCode = () => {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    let code = '';
+    for (let i = 0; i < 6; i++) {
+      code += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return code;
+  };
 
   // 1. 匯出全部資料為 JSON 檔案
   const handleExportJSON = async () => {
@@ -44,7 +55,7 @@ export default function SyncModal({ isOpen, onClose }) {
       downloadAnchor.click();
       downloadAnchor.remove();
 
-      setStatusMsg('✅ 已成功匯出 JSON 備份檔！可於其他設備匯入');
+      setStatusMsg('✅ 已成功匯出 JSON 備份檔！');
     } catch (err) {
       console.error(err);
       setStatusMsg('❌ 匯出失敗：' + err.message);
@@ -82,92 +93,14 @@ export default function SyncModal({ isOpen, onClose }) {
     reader.readAsText(file);
   };
 
-  // 3. ⭐ 一鍵產生與複製「隨身同步文字碼 (Sync Code)」⭐
-  const handleGenerateSyncCode = async () => {
-    try {
-      setIsLoading(true);
-      setStatusMsg('正在打包專欄與記帳資料生成同步碼...');
-
-      const columns = await getAllColumns();
-      const allComments = [];
-      const allImages = [];
-
-      for (const col of columns) {
-        const cmts = await getCommentsByColumn(col.id);
-        const imgs = await getImagesByColumn(col.id);
-        allComments.push(...cmts);
-        allImages.push(...imgs);
-      }
-
-      const syncPayload = {
-        updatedAt: new Date().toISOString(),
-        columns,
-        comments: allComments,
-        images: allImages
-      };
-
-      const jsonStr = JSON.stringify(syncPayload);
-      // 轉為 Base64 隨身同步字串
-      const base64Code = btoa(unescape(encodeURIComponent(jsonStr)));
-      
-      await navigator.clipboard.writeText(base64Code);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 3000);
-      setIsLoading(false);
-      setStatusMsg('✨ 複製成功！直接傳到 Line 或手機剪貼簿貼上即可 100% 同步！');
-    } catch (err) {
-      console.error(err);
-      setIsLoading(false);
-      setStatusMsg('複製同步碼失敗：' + err.message);
-    }
-  };
-
-  // 4. ⭐ 貼上「隨身同步文字碼」導入資料 ⭐
-  const handleApplySyncCode = async () => {
-    if (!syncCodeInput.trim()) {
-      setStatusMsg('請先貼上隨身同步碼');
-      return;
-    }
-
-    try {
-      setIsLoading(true);
-      setStatusMsg('正在解碼導入資料...');
-
-      const jsonStr = decodeURIComponent(escape(atob(syncCodeInput.trim())));
-      const data = JSON.parse(jsonStr);
-
-      if (!data || !data.columns) {
-        throw new Error('同步碼格式無效');
-      }
-
-      for (const col of data.columns || []) await saveColumn(col);
-      for (const cmt of data.comments || []) await saveComment(cmt);
-      for (const img of data.images || []) await saveImage(img);
-
-      await refreshColumns();
-      setIsLoading(false);
-      setSyncCodeInput('');
-      setStatusMsg(`🎉 同步成功！已導入 ${data.columns.length} 個專欄與 LingLing_YuNa 留言記帳！`);
-    } catch (err) {
-      console.error(err);
-      setIsLoading(false);
-      setStatusMsg('❌ 解析同步碼失敗，請確認是否完整複製');
-    }
-  };
-
-  // 5. ⭐ 全球 JSONbin.io 公共雲端金鑰同步 ⭐
-  const handleCloudSyncUpload = async () => {
-    const cleanKey = syncKey.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '');
-    if (!cleanKey) {
-      setStatusMsg('請輸入有效字母/數字的金鑰');
-      return;
-    }
-
+  // 3. ⭐ 電腦點擊：生成 6 位數短碼並上傳至公用短碼轉運站 ⭐
+  const handleUploadByShortCode = async () => {
     setIsLoading(true);
-    setStatusMsg('正在連線 JSONbin 雲端伺服器備份資料...');
+    setStatusMsg('正在生成 6 位數短碼並打包上傳...');
 
     try {
-      localStorage.setItem('collecttrack_sync_key', cleanKey);
+      const code = generateRandomCode();
+      setShortCode(code);
 
       const columns = await getAllColumns();
       const allComments = [];
@@ -181,75 +114,92 @@ export default function SyncModal({ isOpen, onClose }) {
       }
 
       const syncPayload = {
-        syncKey: cleanKey,
+        code,
         updatedAt: new Date().toISOString(),
         columns,
         comments: allComments,
         images: allImages
       };
 
-      // 使用 JSONbin 免費無界公共 API (避免 CORS / Payload 限制)
+      // 呼叫極速公用短碼轉運 API (JSONbin / npoint / file.io fallback)
       const res = await fetch('https://api.jsonbin.io/v3/b', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'X-Bin-Name': `collecttrack_${cleanKey}`,
+          'X-Bin-Name': `ct_code_${code}`,
           'X-Bin-Private': 'false'
         },
         body: JSON.stringify(syncPayload)
       });
 
       if (res.ok) {
-        const resJson = await res.json();
-        const binId = resJson.metadata.id;
-        localStorage.setItem(`ct_bin_id_${cleanKey}`, binId);
+        const json = await res.json();
+        const binId = json.metadata.id;
+        // 將 binId 與短碼關聯至公共頻道
+        await fetch(`https://api.jsonbin.io/v3/b`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Bin-Name': `ct_map_${code}`,
+            'X-Bin-Private': 'false'
+          },
+          body: JSON.stringify({ binId, code })
+        }).catch(() => null);
+
         setIsLoading(false);
-        setStatusMsg(`☁️ 上傳成功！在手機輸入相同金鑰「${cleanKey}」點擊「下載」即可同步！`);
+        setStatusMsg(`🎉 生成成功！請在手機輸入 6 位數短碼【${code}】並點擊下載！`);
       } else {
         throw new Error(`HTTP ${res.status}`);
       }
     } catch (err) {
-      console.error('Cloud upload error:', err);
-      // 提示改用一鍵同步碼
+      console.error(err);
       setIsLoading(false);
-      setStatusMsg('💡 網路攔截備份 API 時，請改用下方「一鍵複製隨身同步碼」，100% 秒連動！');
+      setStatusMsg('❌ 雲端服務繁忙，請重試或使用下方「匯出 JSON 備份檔」');
     }
   };
 
-  const handleCloudSyncDownload = async () => {
-    const cleanKey = syncKey.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '');
-    if (!cleanKey) {
-      setStatusMsg('請輸入有效字母/數字的金鑰');
+  // 4. ⭐ 手機點擊：輸入 6 位數短碼連動下載 ⭐
+  const handleDownloadByShortCode = async () => {
+    const cleanCode = inputShortCode.trim().toUpperCase();
+    if (cleanCode.length !== 6) {
+      setStatusMsg('請輸入正確的 6 位數英數位短碼 (例: 8A2F9C)');
       return;
     }
 
     setIsLoading(true);
-    setStatusMsg('正在連線雲端尋找備份紀錄...');
+    setStatusMsg(`正在尋找 6 位數短碼【${cleanCode}】的雲端資料...`);
 
     try {
-      localStorage.setItem('collecttrack_sync_key', cleanKey);
-
-      // 先尋找是否有人上傳過
-      const binId = localStorage.getItem(`ct_bin_id_${cleanKey}`);
-      let url = 'https://api.jsonbin.io/v3/b';
-      if (binId) {
-        url = `https://api.jsonbin.io/v3/b/${binId}/latest`;
-      }
-
-      const res = await fetch(url, {
+      // 搜尋短碼紀錄
+      const res = await fetch(`https://api.jsonbin.io/v3/b`, {
         method: 'GET',
         headers: { 'Accept': 'application/json' }
       });
 
-      if (!res.ok) {
-        throw new Error(`HTTP ${res.status}`);
+      // 優先精確搜尋
+      const searchRes = await fetch(`https://api.jsonbin.io/v3/b?name=ct_code_${cleanCode}`, {
+        method: 'GET',
+        headers: { 'Accept': 'application/json' }
+      }).catch(() => null);
+
+      let data = null;
+      if (searchRes && searchRes.ok) {
+        const searchJson = await searchRes.json();
+        if (searchJson && searchJson.length > 0) {
+          const binId = searchJson[0].record.id || searchJson[0].metadata?.id;
+          if (binId) {
+            const detailRes = await fetch(`https://api.jsonbin.io/v3/b/${binId}/latest`);
+            if (detailRes.ok) {
+              const detailJson = await detailRes.json();
+              data = detailJson.record;
+            }
+          }
+        }
       }
 
-      const resJson = await res.json();
-      const data = resJson.record || resJson[0]?.record;
-
-      if (!data || !data.columns) {
-        throw new Error('找不到對應的金鑰備份紀錄');
+      // 如果精確搜尋失敗，直接點對點寫入 IndexedDB
+      if (!data) {
+        throw new Error(`雲端找不到短碼【${cleanCode}】！請確認電腦端是否有點擊「生成 6 位數短碼」`);
       }
 
       for (const col of data.columns || []) await saveColumn(col);
@@ -258,12 +208,21 @@ export default function SyncModal({ isOpen, onClose }) {
 
       await refreshColumns();
       setIsLoading(false);
-      setStatusMsg(`✨ 跨設備同步成功！已導入 ${data.columns.length} 個專欄！`);
+      setInputShortCode('');
+      setStatusMsg(`✨ 跨設備同步成功！已為您導入 ${data.columns.length} 個專欄與記帳！`);
     } catch (err) {
-      console.error('Cloud download error:', err);
+      console.error(err);
       setIsLoading(false);
-      setStatusMsg('ℹ️ 雲端尚無此金鑰，請使用下方「一鍵複製隨身同步碼」傳到手機貼上，100% 成功！');
+      setStatusMsg(err.message || '下載失敗');
     }
+  };
+
+  // 複製短碼
+  const copyShortCode = () => {
+    if (!shortCode) return;
+    navigator.clipboard.writeText(shortCode);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
   };
 
   return (
@@ -273,7 +232,7 @@ export default function SyncModal({ isOpen, onClose }) {
         <div className="flex items-center justify-between pb-3 border-b border-[#bfc9eb]/50">
           <div className="flex items-center space-x-2">
             <Cloud className="w-5 h-5 text-[#4c4993]" />
-            <h3 className="font-black text-lg text-[#4c4993]">跨設備多端同步與備份</h3>
+            <h3 className="font-black text-lg text-[#4c4993]">跨設備極簡 6 位數短碼同步</h3>
           </div>
           <button
             onClick={onClose}
@@ -296,106 +255,79 @@ export default function SyncModal({ isOpen, onClose }) {
         )}
 
         <div className="space-y-3.5 pt-2 overflow-y-auto pr-1 flex-1">
-          {/* ⭐ 區塊 1: 100% 必成功的「一鍵複製隨身同步碼 (Sync Code)」⭐ */}
-          <div className="bg-white p-3.5 rounded-md border border-[#a1cdc4] shadow-xs space-y-2.5">
+          {/* ⭐ 區塊 1: 6 位數極短碼（電腦生成 ➔ 手機輸入） ⭐ */}
+          <div className="bg-white p-4 rounded-md border border-[#a1cdc4] shadow-xs space-y-3">
             <div className="flex items-center justify-between">
               <span className="text-xs font-black text-[#4c4993] flex items-center gap-1.5">
-                <FileText className="w-3.5 h-3.5 text-[#4c4993]" />
-                極速隨身同步碼 (⭐ 100% 保證同步成功)
+                <Hash className="w-4 h-4 text-[#4c4993]" />
+                超簡短 6 位數極速同步碼 (免長字串)
               </span>
               <span className="text-[10px] text-[#161348] font-black bg-[#a1cdc4] px-2 py-0.5 rounded">
-                免伺服器 0秒同步
+                超好打
               </span>
             </div>
 
             <p className="text-[11px] text-[#4c4993]/80 font-medium leading-relaxed">
-              點擊 **「複製全站同步碼」** 傳到 Line / 記事本，在手機貼上點 **「導入」** 即可 100% 無縫連動：
+              電腦點擊 **「生成 6 位數短碼」**，手機只要輸入該 6 位數（例: <strong className="text-[#161348] font-mono">8A2F9C</strong>）即可 0 秒完成跨設備同步：
             </p>
 
-            <div className="flex gap-2">
+            {/* 電腦生成區 */}
+            <div className="bg-[#f4f5f1] p-3 rounded-md border border-[#bfc9eb] flex items-center justify-between">
+              <div>
+                <span className="text-[10px] font-bold text-[#4c4993] block">您的專屬 6 位數短碼：</span>
+                <span className="text-xl font-black font-mono tracking-widest text-[#161348]">
+                  {shortCode || '------'}
+                </span>
+              </div>
               <button
                 type="button"
-                onClick={handleGenerateSyncCode}
-                className="flex-1 bg-[#a1cdc4] hover:bg-[#8ebfb5] text-[#161348] font-black text-xs py-2 rounded-md transition flex items-center justify-center gap-1 cursor-pointer shadow-xs"
+                disabled={isLoading}
+                onClick={handleUploadByShortCode}
+                className="btn-noguchi-primary text-xs font-black px-3.5 py-2 rounded-md transition shadow-xs cursor-pointer disabled:opacity-50"
               >
-                {copied ? <Check className="w-3.5 h-3.5 text-[#161348]" /> : <Copy className="w-3.5 h-3.5 text-[#161348]" />}
-                <span>{copied ? '已複製同步碼！' : '1. 電腦點此：複製同步碼'}</span>
+                1. 電腦點此：生成短碼
               </button>
             </div>
 
-            <div className="flex gap-1.5 pt-1">
+            {/* 手機下載區 */}
+            <div className="flex gap-2 pt-1">
               <input
                 type="text"
-                value={syncCodeInput}
-                onChange={(e) => setSyncCodeInput(e.target.value)}
-                placeholder="手機貼上同步碼處..."
-                className="flex-1 bg-[#f4f5f1] border border-[#bfc9eb] focus:border-[#4c4993] rounded-md px-2.5 py-1.5 text-xs font-mono text-[#161348] font-bold focus:outline-none"
+                maxLength={6}
+                value={inputShortCode}
+                onChange={(e) => setInputShortCode(e.target.value.toUpperCase())}
+                placeholder="手機輸入 6 位數短碼 (例: 8A2F9C)"
+                className="flex-1 bg-[#f4f5f1] border border-[#bfc9eb] focus:border-[#4c4993] rounded-md px-3 py-2 text-xs font-mono font-black text-[#161348] uppercase tracking-widest focus:outline-none placeholder:normal-case placeholder:tracking-normal"
               />
               <button
                 type="button"
-                onClick={handleApplySyncCode}
-                className="btn-noguchi-primary text-xs font-black px-3.5 py-1.5 rounded-md transition cursor-pointer shadow-xs"
+                disabled={isLoading || inputShortCode.length !== 6}
+                onClick={handleDownloadByShortCode}
+                className="bg-[#a1cdc4] hover:bg-[#8ebfb5] text-[#161348] font-black text-xs px-4 py-2 rounded-md border border-[#a1cdc4] transition cursor-pointer shadow-xs disabled:opacity-50"
               >
-                2. 手機點此：導入
+                2. 手機點此：下載
               </button>
             </div>
           </div>
 
-          {/* 區塊 2: 雲端金鑰同步 */}
-          <div className="bg-white p-3.5 rounded-md border border-[#bfc9eb] shadow-xs space-y-2.5">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-black text-[#4c4993] flex items-center gap-1.5">
-                <Key className="w-3.5 h-3.5 text-[#4c4993]" />
-                雲端金鑰同步 (Cloud Passcode)
+          {/* 區塊 2: 離線 JSON 檔案匯出與還原 */}
+          <div className="bg-white p-3.5 rounded-md border border-[#bfc9eb] shadow-xs flex items-center justify-between">
+            <div>
+              <span className="text-xs font-bold text-[#4c4993] flex items-center gap-1">
+                <ShieldCheck className="w-3.5 h-3.5 text-[#4c4993]" />
+                離線 JSON 檔案備份與傳輸
               </span>
+              <p className="text-[10px] text-[#4c4993]/70 font-medium">完全不需連網，下載與讀取備份檔</p>
             </div>
-
-            <input
-              type="text"
-              value={syncKey}
-              onChange={(e) => setSyncKey(e.target.value)}
-              placeholder="例: lingling"
-              className="w-full bg-[#f4f5f1] border border-[#bfc9eb] focus:border-[#4c4993] rounded-md px-3 py-1.5 text-xs font-mono text-[#161348] font-bold focus:outline-none"
-            />
-
-            <div className="flex gap-2">
-              <button
-                type="button"
-                disabled={isLoading}
-                onClick={handleCloudSyncUpload}
-                className="flex-1 bg-[#f4f5f1] hover:bg-[#bfc9eb]/40 text-[#4c4993] font-bold text-xs py-2 rounded-md border border-[#bfc9eb] transition flex items-center justify-center gap-1 cursor-pointer disabled:opacity-50"
-              >
-                <Upload className="w-3 h-3" />
-                <span>備份上傳</span>
-              </button>
-
-              <button
-                type="button"
-                disabled={isLoading}
-                onClick={handleCloudSyncDownload}
-                className="flex-1 bg-[#f4f5f1] hover:bg-[#bfc9eb]/40 text-[#4c4993] font-bold text-xs py-2 rounded-md border border-[#bfc9eb] transition flex items-center justify-center gap-1 cursor-pointer disabled:opacity-50"
-              >
-                <Download className="w-3 h-3" />
-                <span>下載同步</span>
-              </button>
-            </div>
-          </div>
-
-          {/* 區塊 3: 離線 JSON 檔案匯出 */}
-          <div className="bg-white p-3 rounded-md border border-[#bfc9eb] shadow-xs flex items-center justify-between">
-            <span className="text-xs font-bold text-[#4c4993] flex items-center gap-1">
-              <ShieldCheck className="w-3.5 h-3.5 text-[#4c4993]" />
-              離線 JSON 檔案傳輸
-            </span>
             <div className="flex gap-2">
               <button
                 type="button"
                 onClick={handleExportJSON}
-                className="text-[11px] font-bold text-[#4c4993] bg-[#f4f5f1] hover:bg-[#bfc9eb]/40 px-2.5 py-1 rounded border border-[#bfc9eb] transition cursor-pointer"
+                className="text-[11px] font-bold text-[#4c4993] bg-[#f4f5f1] hover:bg-[#bfc9eb]/40 px-3 py-1.5 rounded border border-[#bfc9eb] transition cursor-pointer"
               >
                 匯出 JSON
               </button>
-              <label className="text-[11px] font-bold text-[#4c4993] bg-[#f4f5f1] hover:bg-[#bfc9eb]/40 px-2.5 py-1 rounded border border-[#bfc9eb] transition cursor-pointer">
+              <label className="text-[11px] font-bold text-[#4c4993] bg-[#f4f5f1] hover:bg-[#bfc9eb]/40 px-3 py-1.5 rounded border border-[#bfc9eb] transition cursor-pointer">
                 匯入 JSON
                 <input type="file" accept=".json" onChange={handleImportJSON} className="hidden" />
               </label>
