@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
 import { useApp } from '../context/AppContext';
-import { X, ChevronLeft, ChevronRight, Trash2, Calendar, Tag, Sparkles } from 'lucide-react';
+import { X, ChevronLeft, ChevronRight, Trash2, ExternalLink, Download } from 'lucide-react';
 
 export default function LightboxModal() {
   const { lightboxImage, setLightboxImage, columnImages, handleDeleteImage } = useApp();
@@ -25,6 +25,56 @@ export default function LightboxModal() {
     } else {
       setLightboxImage(columnImages[0]);
     }
+  };
+
+  // ⭐ 100% 突破瀏覽器 Data URL 安全限制：在新分頁中完美開啟圖片 ⭐
+  const handleOpenInNewTab = (e) => {
+    e?.stopPropagation();
+    const url = lightboxImage.url;
+    if (!url) return;
+
+    try {
+      if (url.startsWith('data:')) {
+        // 將 Base64 Data URL 轉換為原生 Blob 物件，讓瀏覽器允許在新分頁開啟！
+        const parts = url.split(',');
+        const mime = parts[0].match(/:(.*?);/)[1] || 'image/png';
+        const bstr = atob(parts[1]);
+        let n = bstr.length;
+        const u8arr = new Uint8Array(n);
+        while (n--) {
+          u8arr[n] = bstr.charCodeAt(n);
+        }
+        const blob = new Blob([u8arr], { type: mime });
+        const blobUrl = URL.createObjectURL(blob);
+        const newWin = window.open(blobUrl, '_blank');
+        if (!newWin) {
+          alert('請允許此網站開啟跳出式視窗，以在新分頁查看圖片');
+        }
+      } else {
+        window.open(url, '_blank');
+      }
+    } catch (err) {
+      console.error('Failed to open image in new tab:', err);
+      // Fallback 建立可新分頁開啟的新視窗
+      const w = window.open('');
+      if (w) {
+        w.document.write(`<img src="${url}" style="max-width:100%;height:auto;margin:auto;display:block;" />`);
+      }
+    }
+  };
+
+  // 直接下載高畫質原圖
+  const handleDownload = (e) => {
+    e?.stopPropagation();
+    const url = lightboxImage.url;
+    if (!url) return;
+
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = `CollectTrack_Image_${Date.now()}.png`;
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
   };
 
   // 鍵盤左右方向鍵與 Esc 鍵導覽控制
@@ -52,7 +102,7 @@ export default function LightboxModal() {
         onClick={(e) => e.stopPropagation()}
         className="relative max-w-5xl max-h-[92vh] flex flex-col items-center justify-center bg-[#f4f5f1] border border-[#4c4993]/30 rounded-lg shadow-2xl p-4 overflow-hidden animate-scale-up"
       >
-        {/* 頂部工具列 (2R 微圓角) */}
+        {/* 頂部工具列 */}
         <div className="w-full flex items-center justify-between pb-3 border-b border-[#4c4993]/20 mb-3 text-[#4c4993]">
           <div className="flex items-center space-x-2">
             <span className="text-xs font-black bg-[#4c4993] text-white px-2.5 py-0.5 rounded font-mono shadow-xs">
@@ -64,6 +114,26 @@ export default function LightboxModal() {
           </div>
 
           <div className="flex items-center space-x-2">
+            {/* ⭐ 新增【在新分頁開啟原圖】按鈕 ⭐ */}
+            <button
+              onClick={handleOpenInNewTab}
+              className="px-2.5 py-1 bg-[#a1cdc4] hover:bg-[#8ebfb5] text-[#161348] text-xs font-black rounded border border-[#a1cdc4] transition flex items-center gap-1 cursor-pointer shadow-xs"
+              title="在新分頁中開啟高畫質原圖"
+            >
+              <ExternalLink className="w-3.5 h-3.5 text-[#161348]" />
+              <span>在新分頁開啟</span>
+            </button>
+
+            {/* 下載原圖按鈕 */}
+            <button
+              onClick={handleDownload}
+              className="p-1.5 bg-[#f4f5f1] hover:bg-[#bfc9eb]/40 text-[#4c4993] rounded border border-[#4c4993]/30 transition cursor-pointer"
+              title="下載高畫質原圖"
+            >
+              <Download className="w-4 h-4" />
+            </button>
+
+            {/* 刪除照片 */}
             <button
               onClick={() => handleDeleteImage(lightboxImage.id)}
               className="p-1.5 bg-[#f4f5f1] hover:bg-red-100 text-red-600 rounded border border-red-300 transition cursor-pointer"
@@ -72,6 +142,7 @@ export default function LightboxModal() {
               <Trash2 className="w-4 h-4" />
             </button>
 
+            {/* 關閉按鈕 */}
             <button
               onClick={() => setLightboxImage(null)}
               className="p-1.5 bg-[#f4f5f1] hover:bg-[#bfc9eb]/40 text-[#4c4993] rounded border border-[#4c4993]/30 transition cursor-pointer"
@@ -82,7 +153,7 @@ export default function LightboxModal() {
           </div>
         </div>
 
-        {/* 圖片展示區 (2R 導角) */}
+        {/* 圖片展示區 */}
         <div className="relative flex items-center justify-center w-full max-h-[70vh] overflow-hidden bg-[#161348] rounded border border-[#4c4993]/30 group">
           <img
             src={lightboxImage.url}
@@ -118,7 +189,7 @@ export default function LightboxModal() {
             {lightboxImage.caption || '無圖說標註'}
           </p>
           <span className="text-[10px] font-mono text-[#4c4993]/70 font-semibold">
-            可按鍵盤 ← / → 切換圖片，Esc 鍵離開
+            可點右上角「在新分頁開啟」看高畫質原圖，鍵盤 ← / → 切換圖片
           </span>
         </div>
       </div>
