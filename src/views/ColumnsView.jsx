@@ -2,13 +2,14 @@ import React, { useState, useMemo, useLayoutEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import ColumnDetailView from './ColumnDetailView';
 import ExcelImportModal from '../components/ExcelImportModal';
-import { Plus, FolderHeart, ArrowRight, Sparkles, Image as ImageIcon, FileSpreadsheet, ArrowUpDown, Clock, RefreshCw } from 'lucide-react';
+import { Plus, FolderHeart, ArrowRight, Sparkles, Image as ImageIcon, FileSpreadsheet, ArrowUpDown, Clock, RefreshCw, Heart, Search, X } from 'lucide-react';
 
 export default function ColumnsView() {
-  const { columns, selectedColumnId, setSelectedColumnId, setIsColumnModalOpen, setEditingColumn } = useApp();
+  const { columns, selectedColumnId, setSelectedColumnId, setIsColumnModalOpen, setEditingColumn, handleToggleFavorite } = useApp();
   const [isExcelModalOpen, setIsExcelModalOpen] = useState(false);
 
-  // 專欄排序模式：預設以內容更新時間 (updated_desc) 排序！
+  // 專欄搜尋與排序模式
+  const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState('updated_desc');
 
   // 自動恢復回到上一頁時的滾動位置
@@ -26,12 +27,32 @@ export default function ColumnsView() {
     }
   }, [selectedColumnId]);
 
-  // 計算動態排序後的專欄列表
-  const sortedColumns = useMemo(() => {
+  // ⭐ 計算即時過濾 (搜尋關鍵字) 與動態排序後的專欄列表 ⭐
+  const filteredAndSortedColumns = useMemo(() => {
     if (!columns || columns.length === 0) return [];
     
-    return [...columns].sort((a, b) => {
-      if (sortBy === 'updated_desc') {
+    // 1. 搜尋過濾 (匹配標題、簡介、分類、標籤)
+    const query = searchQuery.trim().toLowerCase();
+    let result = columns.filter((col) => {
+      if (!query) return true;
+      const matchTitle = (col.title || '').toLowerCase().includes(query);
+      const matchDesc = (col.description || '').toLowerCase().includes(query);
+      const matchCategory = (col.category || '').toLowerCase().includes(query);
+      const matchTags = (col.tags || []).some(t => t.toLowerCase().includes(query));
+      return matchTitle || matchDesc || matchCategory || matchTags;
+    });
+
+    // 2. 排序處理
+    return result.sort((a, b) => {
+      if (sortBy === 'favorite') {
+        // 先按我的最愛置頂，再按更新時間
+        if (a.isFavorite !== b.isFavorite) {
+          return a.isFavorite ? -1 : 1;
+        }
+        const timeA = new Date(a.updatedAt || a.createdAt || 0).getTime();
+        const timeB = new Date(b.updatedAt || b.createdAt || 0).getTime();
+        return timeB - timeA;
+      } else if (sortBy === 'updated_desc') {
         const timeA = new Date(a.updatedAt || a.createdAt || 0).getTime();
         const timeB = new Date(b.updatedAt || b.createdAt || 0).getTime();
         return timeB - timeA;
@@ -50,109 +71,154 @@ export default function ColumnsView() {
       }
       return 0;
     });
-  }, [columns, sortBy]);
+  }, [columns, searchQuery, sortBy]);
+
+  // 最愛專欄數量
+  const favoriteCount = useMemo(() => columns.filter(c => c.isFavorite).length, [columns]);
 
   if (selectedColumnId) {
     return <ColumnDetailView />;
   }
 
   return (
-    <div className="space-y-5 animate-fade-in pb-12">
-      {/* 標題與簡介區 */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-gradient-to-r from-[#f4f5f1] via-[#e8ebf7] to-[#d6dedf] p-5 rounded-lg border border-[#bfc9eb] shadow-xs">
-        <div>
-          <div className="flex items-center space-x-2 mb-1">
-            <FolderHeart className="w-5 h-5 text-[#4c4993]" />
-            <h2 className="text-lg sm:text-xl font-black text-[#4c4993] tracking-tight">
-              二次元專欄展示牆
-            </h2>
+    <div className="space-y-4 sm:space-y-5 animate-fade-in pb-12">
+      {/* 標題與搜尋/動作區 */}
+      <div className="bg-gradient-to-r from-[#f4f5f1] via-[#e8ebf7] to-[#d6dedf] p-4 sm:p-5 rounded-lg border border-[#bfc9eb] shadow-xs space-y-3.5">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <div className="flex items-center space-x-2 mb-1">
+              <FolderHeart className="w-5 h-5 text-[#4c4993]" />
+              <h2 className="text-lg sm:text-xl font-black text-[#4c4993] tracking-tight">
+                二次元專欄展示牆
+              </h2>
+            </div>
+            <p className="text-[#4c4993] text-xs font-semibold">
+              建立專屬的主題專欄藝廊，上傳宣圖與擺設照，搭配「留言即記帳」自動精算總花費
+            </p>
           </div>
-          <p className="text-[#4c4993] text-xs font-semibold">
-            建立專屬的主題專欄藝廊，上傳宣圖與擺設照，搭配「留言即記帳」自動精算總花費
-          </p>
+
+          <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
+            <button
+              onClick={() => setIsExcelModalOpen(true)}
+              className="bg-[#f4f5f1] hover:bg-white text-[#4c4993] font-black text-xs px-3 py-1.5 rounded-lg border border-[#4c4993]/30 transition flex items-center gap-1.5 cursor-pointer shadow-xs"
+              title="從 Excel (.xlsx, .csv) 批量匯入專欄"
+            >
+              <FileSpreadsheet className="w-3.5 h-3.5 text-[#4c4993]" />
+              <span>Excel 匯入</span>
+            </button>
+
+            <button
+              onClick={() => {
+                setEditingColumn(null);
+                setIsColumnModalOpen(true);
+              }}
+              className="btn-noguchi-primary font-black text-xs px-3.5 py-1.5 rounded-lg transition flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
+            >
+              <Plus className="w-3.5 h-3.5 text-white" />
+              <span>建立展示專欄</span>
+            </button>
+          </div>
         </div>
 
-        {/* 動作按鈕區: 動態排序切換選單 */}
-        <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
-          <div className="relative inline-flex items-center bg-[#f4f5f1] border border-[#4c4993]/40 rounded-lg px-2.5 py-1.5 shadow-xs">
+        {/* ⭐ 專欄關鍵字搜尋列 & 排序過濾下拉選單 ⭐ */}
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 pt-1 border-t border-[#4c4993]/15">
+          {/* 搜尋框 */}
+          <div className="relative flex-1">
+            <Search className="w-4 h-4 text-[#4c4993]/70 absolute left-3 top-1/2 -translate-y-1/2" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="搜尋專欄標題、簡介、分類、標籤 (如: 立牌, 徽章, 谷子)..."
+              className="w-full bg-white border border-[#4c4993]/30 focus:border-[#4c4993] rounded-lg pl-9 pr-8 py-1.5 text-xs font-bold text-[#161348] focus:outline-none shadow-xs placeholder:text-[#4c4993]/50"
+            />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery('')}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#4c4993]/60 hover:text-[#4c4993] p-0.5"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+
+          {/* 排序選單 */}
+          <div className="relative inline-flex items-center bg-white border border-[#4c4993]/30 rounded-lg px-2.5 py-1.5 shadow-xs shrink-0">
             <ArrowUpDown className="w-3.5 h-3.5 text-[#4c4993] mr-1.5 shrink-0" />
-            <span className="text-[11px] font-black text-[#4c4993] mr-1 hidden sm:inline">排序:</span>
+            <span className="text-[11px] font-black text-[#4c4993] mr-1">排序:</span>
             <select
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value)}
               className="bg-transparent text-xs font-extrabold text-[#161348] focus:outline-none cursor-pointer pr-1"
             >
-              <option value="updated_desc">🔄 內容更新時間：由新到舊 (最新有動態)</option>
-              <option value="updated_asc">⌛ 內容更新時間：由舊到新</option>
+              <option value="updated_desc">🔄 內容更新時間：最新在前</option>
+              <option value="favorite">❤️ 我的最愛專欄優先 (共 {favoriteCount} 個)</option>
               <option value="newest">🕒 專欄建立時間：由新到舊</option>
               <option value="oldest">⏳ 專欄建立時間：由舊到新</option>
               <option value="amount_desc">💰 依花費金額：高到低</option>
               <option value="name">🔤 依專欄名稱字典序</option>
             </select>
           </div>
-
-          <button
-            onClick={() => setIsExcelModalOpen(true)}
-            className="bg-[#f4f5f1] hover:bg-white text-[#4c4993] font-black text-xs px-3 py-1.5 rounded-lg border border-[#4c4993]/30 transition flex items-center gap-1.5 cursor-pointer shadow-xs"
-            title="從 Excel (.xlsx, .csv) 批量匯入專欄"
-          >
-            <FileSpreadsheet className="w-3.5 h-3.5 text-[#4c4993]" />
-            <span>Excel 匯入</span>
-          </button>
-
-          <button
-            onClick={() => {
-              setEditingColumn(null);
-              setIsColumnModalOpen(true);
-            }}
-            className="btn-noguchi-primary font-black text-xs px-3.5 py-1.5 rounded-lg transition flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
-          >
-            <Plus className="w-3.5 h-3.5 text-white" />
-            <span>建立展示專欄</span>
-          </button>
         </div>
       </div>
 
+      {/* 專欄搜尋過濾結果提示 */}
+      {searchQuery && (
+        <div className="flex items-center justify-between text-xs text-[#4c4993] font-bold px-1">
+          <span>搜尋「<strong className="text-[#161348]">{searchQuery}</strong>」結果：找到 {filteredAndSortedColumns.length} 個相符專欄</span>
+          <button
+            onClick={() => setSearchQuery('')}
+            className="text-[11px] text-[#4c4993]/80 hover:text-[#4c4993] underline cursor-pointer"
+          >
+            清除搜尋
+          </button>
+        </div>
+      )}
+
       {/* 嚴格左一右二橫向 Row-First CSS Grid (grid-cols-2 lg:grid-cols-3) */}
-      {sortedColumns.length === 0 ? (
+      {filteredAndSortedColumns.length === 0 ? (
         <div className="bg-[#f4f5f1] rounded-lg p-10 text-center border-2 border-dashed border-[#bfc9eb] shadow-xs">
           <div className="w-12 h-12 bg-[#a1cdc4]/30 rounded-lg flex items-center justify-center mx-auto mb-3 border border-[#a1cdc4]">
             <Sparkles className="w-6 h-6 text-[#4c4993]" />
           </div>
-          <h3 className="text-base font-black text-[#4c4993] mb-1.5">專欄牆目前尚無資料</h3>
+          <h3 className="text-base font-black text-[#4c4993] mb-1.5">
+            {searchQuery ? '找不到相符的專欄' : '專欄牆目前尚無資料'}
+          </h3>
           <p className="text-xs text-[#4c4993] font-bold max-w-md mx-auto mb-5">
-            點擊下方「建立第一個專欄」或「Excel 匯入」開始新增您的第一個主題展示牆！
+            {searchQuery ? '請嘗試更換搜尋關鍵字或點擊右上角清除搜尋' : '點擊「建立第一個專欄」或「Excel 匯入」開始新增您的第一個主題展示牆！'}
           </p>
-          <div className="flex items-center justify-center gap-2">
-            <button
-              onClick={() => setIsExcelModalOpen(true)}
-              className="bg-[#f4f5f1] hover:bg-white text-[#4c4993] font-black text-xs px-4 py-2.5 rounded-lg border border-[#4c4993]/30 transition inline-flex items-center gap-1.5 shadow-xs cursor-pointer"
-            >
-              <FileSpreadsheet className="w-4 h-4 text-[#4c4993]" />
-              <span>Excel 批量匯入</span>
-            </button>
-            <button
-              onClick={() => {
-                setEditingColumn(null);
-                setIsColumnModalOpen(true);
-              }}
-              className="btn-noguchi-primary font-black text-xs px-5 py-2.5 rounded-lg transition inline-flex items-center gap-2 shadow-xs cursor-pointer"
-            >
-              <Plus className="w-4 h-4 text-white" />
-              <span>建立第一個專欄</span>
-            </button>
-          </div>
+          {!searchQuery && (
+            <div className="flex items-center justify-center gap-2">
+              <button
+                onClick={() => setIsExcelModalOpen(true)}
+                className="bg-[#f4f5f1] hover:bg-white text-[#4c4993] font-black text-xs px-4 py-2.5 rounded-lg border border-[#4c4993]/30 transition inline-flex items-center gap-1.5 shadow-xs cursor-pointer"
+              >
+                <FileSpreadsheet className="w-4 h-4 text-[#4c4993]" />
+                <span>Excel 批量匯入</span>
+              </button>
+              <button
+                onClick={() => {
+                  setEditingColumn(null);
+                  setIsColumnModalOpen(true);
+                }}
+                className="btn-noguchi-primary font-black text-xs px-5 py-2.5 rounded-lg transition inline-flex items-center gap-2 shadow-xs cursor-pointer"
+              >
+                <Plus className="w-4 h-4 text-white" />
+                <span>建立第一個專欄</span>
+              </button>
+            </div>
+          )}
         </div>
       ) : (
         <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-5 items-start">
-          {sortedColumns.map((col) => (
+          {filteredAndSortedColumns.map((col) => (
             <div
               key={col.id}
               onClick={() => setSelectedColumnId(col.id)}
-              className="group glass-card rounded-lg overflow-hidden cursor-pointer transition-all duration-200 hover:-translate-y-0.5 flex flex-col justify-between h-full"
+              className="group glass-card rounded-lg overflow-hidden cursor-pointer transition-all duration-200 hover:-translate-y-0.5 flex flex-col justify-between h-full relative"
             >
               <div>
-                {/* 封面圖 */}
+                {/* 封面圖 (含「我的最愛」愛心按鈕) */}
                 <div className="w-full relative overflow-hidden bg-[#e8ebf7] min-h-[110px] flex items-center justify-center">
                   {col.coverImage ? (
                     <img
@@ -174,8 +240,24 @@ export default function ColumnsView() {
                     </span>
                   </div>
 
-                  {/* 頂部右側：目前總花費 */}
-                  <div className="absolute top-2 right-2">
+                  {/* ⭐ 頂部右側：我的最愛愛心按鈕 ⭐ */}
+                  <button
+                    type="button"
+                    onClick={(e) => handleToggleFavorite(col.id, e)}
+                    className="absolute top-2 right-2 p-1.5 rounded-full bg-black/40 hover:bg-black/60 transition cursor-pointer backdrop-blur-xs border border-white/40 shadow-md group/heart"
+                    title={col.isFavorite ? '取消收藏我的最愛' : '加入我的最愛'}
+                  >
+                    <Heart
+                      className={`w-3.5 h-3.5 transition-transform group-hover/heart:scale-110 ${
+                        col.isFavorite
+                          ? 'fill-[#e11d48] text-[#e11d48]'
+                          : 'text-white/90 hover:text-white'
+                      }`}
+                    />
+                  </button>
+
+                  {/* 封面圖下方花費膠囊 */}
+                  <div className="absolute bottom-2 right-2">
                     <span className="text-[10px] font-black px-2 py-0.5 rounded bg-[#a1cdc4] text-[#161348] shadow-xs border border-white/60 font-mono flex items-center gap-1">
                       NT$ {(col.totalAmount || 0).toLocaleString()}
                     </span>
@@ -184,8 +266,11 @@ export default function ColumnsView() {
 
                 {/* 專欄內文 */}
                 <div className="p-3 sm:p-4">
-                  <h3 className="font-black text-sm sm:text-base text-[#4c4993] group-hover:text-[#2b2773] transition mb-1 line-clamp-1">
-                    {col.title}
+                  <h3 className="font-black text-sm sm:text-base text-[#4c4993] group-hover:text-[#2b2773] transition mb-1 line-clamp-1 flex items-center gap-1">
+                    {col.isFavorite && (
+                      <Heart className="w-3.5 h-3.5 fill-[#e11d48] text-[#e11d48] shrink-0" />
+                    )}
+                    <span>{col.title}</span>
                   </h3>
                   <p className="text-[#4c4993]/90 text-[10px] sm:text-xs line-clamp-2 leading-relaxed mb-2 font-semibold">
                     {col.description || '無簡介說明'}
@@ -204,7 +289,7 @@ export default function ColumnsView() {
                 </div>
               </div>
 
-              {/* 底部指引：顯示內容更新時間或建立時間 */}
+              {/* 底部指引 */}
               <div className="px-3 py-2 border-t border-[#bfc9eb]/60 bg-[#f4f5f1] flex items-center justify-between text-[10px] sm:text-xs text-[#4c4993] mt-auto">
                 <div className="flex items-center gap-1 text-[#4c4993]/80 font-mono font-bold" title="內容最後更新時間">
                   <RefreshCw className="w-3 h-3 text-[#4c4993]" />

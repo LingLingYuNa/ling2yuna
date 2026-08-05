@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { useApp } from '../context/AppContext';
 import CommentLedger from '../components/CommentLedger';
-import { ArrowLeft, Plus, Image as ImageIcon, Edit3, Trash2, Maximize2, Calculator, ChevronUp, ChevronDown, CheckSquare, Square } from 'lucide-react';
+import { ArrowLeft, Plus, Image as ImageIcon, Edit3, Trash2, Maximize2, Calculator, ChevronUp, ChevronDown, CheckSquare, Square, Heart } from 'lucide-react';
 
 export default function ColumnDetailView() {
   const {
@@ -17,7 +17,8 @@ export default function ColumnDetailView() {
     setEditingColumn,
     handleDeleteColumn,
     handleDeleteImagesBatch,
-    handleDeleteAllImages
+    handleDeleteAllImages,
+    handleToggleFavorite
   } = useApp();
 
   // 專欄最上方的專欄介紹摺疊狀態 (預設摺疊收合)
@@ -27,9 +28,7 @@ export default function ColumnDetailView() {
   const [isSelectMode, setIsSelectMode] = useState(false);
   const [selectedImageIds, setSelectedImageIds] = useState([]);
 
-  // ⭐ Pinterest 雙欄【左一、右二】真瀑布流 (True Masonry) 分拆 ⭐
-  // 左欄收納：Index 0, 2, 4, 6... (左一、下左三、下左五...)
-  // 右欄收納：Index 1, 3, 5, 7... (右二、下右四、下右六...)
+  // Pinterest 雙欄【左一、右二】真瀑布流 (True Masonry) 分拆
   const leftColumnImages = useMemo(
     () => columnImages.filter((_, idx) => idx % 2 === 0),
     [columnImages]
@@ -93,7 +92,6 @@ export default function ColumnDetailView() {
             : 'border-[#4c4993]/30 bg-white hover:border-[#4c4993]'
         }`}
       >
-        {/* 100% 保持圖片原有長寬比例，絕不裁切拉伸 */}
         <img
           src={img.url}
           alt={img.caption || '專欄展圖'}
@@ -143,6 +141,24 @@ export default function ColumnDetailView() {
         </button>
 
         <div className="flex items-center space-x-2">
+          {/* ⭐ 切換我的最愛按鈕 ⭐ */}
+          <button
+            onClick={(e) => handleToggleFavorite(currentColumn.id, e)}
+            className="inline-flex items-center gap-1.5 text-[#4c4993] text-xs font-black bg-[#f4f5f1] hover:bg-white px-3 py-1.5 rounded-lg border border-[#4c4993]/30 transition cursor-pointer shadow-xs"
+            title={currentColumn.isFavorite ? '取消收藏我的最愛' : '加入我的最愛'}
+          >
+            <Heart
+              className={`w-4 h-4 transition-transform ${
+                currentColumn.isFavorite
+                  ? 'fill-[#e11d48] text-[#e11d48] scale-110'
+                  : 'text-[#4c4993] hover:text-[#e11d48]'
+              }`}
+            />
+            <span className="hidden sm:inline">
+              {currentColumn.isFavorite ? '已加入最愛' : '加最愛'}
+            </span>
+          </button>
+
           <button
             onClick={() => setIsHeaderCollapsed(!isHeaderCollapsed)}
             className="inline-flex items-center gap-1 text-[#4c4993] text-xs font-extrabold bg-[#f4f5f1] hover:bg-white px-3 py-1.5 rounded-lg border border-[#4c4993]/30 transition cursor-pointer shadow-xs"
@@ -189,8 +205,11 @@ export default function ColumnDetailView() {
               <span className="text-[11px] font-black px-2 py-0.5 rounded bg-[#a1cdc4] text-[#161348] shadow-xs">
                 {currentColumn.category}
               </span>
-              <h1 className="text-base sm:text-lg font-black text-white tracking-tight line-clamp-1">
-                {currentColumn.title}
+              <h1 className="text-base sm:text-lg font-black text-white tracking-tight line-clamp-1 flex items-center gap-1.5">
+                {currentColumn.isFavorite && (
+                  <Heart className="w-4 h-4 fill-[#e11d48] text-[#e11d48] shrink-0" />
+                )}
+                <span>{currentColumn.title}</span>
               </h1>
             </div>
 
@@ -232,8 +251,11 @@ export default function ColumnDetailView() {
                   ))}
                 </div>
 
-                <h1 className="text-xl sm:text-3xl font-black text-white tracking-tight mb-1.5 drop-shadow-md">
-                  {currentColumn.title}
+                <h1 className="text-xl sm:text-3xl font-black text-white tracking-tight mb-1.5 drop-shadow-md flex items-center gap-2">
+                  {currentColumn.isFavorite && (
+                    <Heart className="w-6 h-6 fill-[#e11d48] text-[#e11d48] shrink-0 drop-shadow-xs" />
+                  )}
+                  <span>{currentColumn.title}</span>
                 </h1>
 
                 <p className="text-white/95 text-xs sm:text-sm max-w-3xl leading-relaxed font-medium drop-shadow-xs">

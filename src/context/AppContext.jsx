@@ -46,28 +46,24 @@ export function AppProvider({ children }) {
     setSelectedColumnIdState(id);
   };
 
-  // ⭐ 處理手機返回鍵 (Popstate & 雙擊返回鍵退出保護) ⭐
+  // 處理手機返回鍵 (Popstate & 雙擊返回鍵退出保護)
   useEffect(() => {
     let lastBackPressTime = 0;
     let toastTimer = null;
 
-    // 初次載入歷史壓入
     if (!window.history.state) {
       window.history.replaceState({ page: selectedColumnId ? 'detail' : 'home' }, '');
     }
 
-    const handlePopState = (event) => {
-      // 情況 A：人在專欄詳細頁時，按手機返回鍵 ➔ 返回專欄總覽牆
+    const handlePopState = () => {
       if (selectedColumnId) {
         setSelectedColumnIdState(null);
         localStorage.setItem('collecttrack_selected_column_id', 'HOME');
         return;
       }
 
-      // 情況 B：人在專欄總覽牆時 ➔ 連按兩次返回鍵才能退出 App
       const now = Date.now();
       if (now - lastBackPressTime < 2000) {
-        // 2 秒內按了第二次：允許退出
         window.history.back();
       } else {
         lastBackPressTime = now;
@@ -77,7 +73,6 @@ export function AppProvider({ children }) {
           setExitToastVisible(false);
         }, 2000);
 
-        // 壓入防護 State，避免單次按下即關閉網頁
         window.history.pushState({ page: 'home' }, '', window.location.pathname);
       }
     };
@@ -117,7 +112,7 @@ export function AppProvider({ children }) {
     refreshColumns();
   }, []);
 
-  // 輔助函式：觸發指定專欄的 updatedAt 時間戳記更新
+  // 觸發指定專欄的 updatedAt 時間戳記更新
   const touchColumnUpdatedAt = async (colId) => {
     const target = columns.find(c => c.id === colId);
     if (!target) return;
@@ -126,6 +121,22 @@ export function AppProvider({ children }) {
       ...target,
       updatedAt: now
     };
+    await saveColumn(updatedCol);
+    setColumns(prev => prev.map(c => (c.id === colId ? updatedCol : c)));
+  };
+
+  // ⭐ 切換「我的最愛」狀態 ⭐
+  const handleToggleFavorite = async (colId, e) => {
+    if (e) e.stopPropagation();
+    const target = columns.find(c => c.id === colId);
+    if (!target) return;
+
+    const updatedCol = {
+      ...target,
+      isFavorite: !target.isFavorite,
+      updatedAt: new Date().toISOString()
+    };
+
     await saveColumn(updatedCol);
     setColumns(prev => prev.map(c => (c.id === colId ? updatedCol : c)));
   };
@@ -169,6 +180,7 @@ export function AppProvider({ children }) {
       category: columnData.category || '宣圖',
       coverImage: columnData.coverImage || '',
       tags: columnData.tags || [],
+      isFavorite: columnData.isFavorite || false,
       createdAt: columnData.createdAt || now,
       updatedAt: now
     };
@@ -349,6 +361,7 @@ export function AppProvider({ children }) {
         handleSaveColumn,
         handleDeleteColumn,
         handleResetData,
+        handleToggleFavorite,
         handleAddComment,
         handleUpdateComment,
         handleDeleteComment,
@@ -362,7 +375,7 @@ export function AppProvider({ children }) {
     >
       {children}
 
-      {/* ⭐ 雙擊返回鍵退出提示 Toast ⭐ */}
+      {/* 雙擊返回鍵退出提示 Toast */}
       {exitToastVisible && (
         <div className="fixed bottom-16 left-1/2 -translate-x-1/2 z-50 bg-[#161348] text-white text-xs font-black px-4 py-2 rounded-full shadow-lg border border-[#a1cdc4] animate-bounce">
           再按一次返回鍵退出 CollectTrack
