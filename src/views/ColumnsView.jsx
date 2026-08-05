@@ -2,11 +2,14 @@ import React, { useState, useMemo, useLayoutEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import ColumnDetailView from './ColumnDetailView';
 import ExcelImportModal from '../components/ExcelImportModal';
-import { Plus, FolderHeart, ArrowRight, Sparkles, Image as ImageIcon, FileSpreadsheet, ArrowUpDown, Clock, RefreshCw, Heart, Search, X } from 'lucide-react';
+import { Plus, FolderHeart, ArrowRight, Sparkles, Image as ImageIcon, FileSpreadsheet, ArrowUpDown, Clock, RefreshCw, Heart, Search, X, MapPin, ChevronDown, ChevronUp, Maximize2 } from 'lucide-react';
 
 export default function ColumnsView() {
-  const { columns, selectedColumnId, setSelectedColumnId, setIsColumnModalOpen, setEditingColumn, handleToggleFavorite } = useApp();
+  const { columns, selectedColumnId, setSelectedColumnId, setIsColumnModalOpen, setEditingColumn, handleToggleFavorite, setLightboxImage } = useApp();
   const [isExcelModalOpen, setIsExcelModalOpen] = useState(false);
+
+  // 攤位對照圖摺疊狀態 (預設展開供對照)
+  const [showBoothMap, setShowBoothMap] = useState(true);
 
   // 專欄搜尋與排序模式
   const [searchQuery, setSearchQuery] = useState('');
@@ -27,11 +30,10 @@ export default function ColumnsView() {
     }
   }, [selectedColumnId]);
 
-  // ⭐ 計算即時過濾 (搜尋關鍵字) 與動態排序後的專欄列表 ⭐
+  // 計算即時過濾 (搜尋關鍵字) 與動態排序後的專欄列表
   const filteredAndSortedColumns = useMemo(() => {
     if (!columns || columns.length === 0) return [];
     
-    // 1. 搜尋過濾 (匹配標題、簡介、分類、標籤)
     const query = searchQuery.trim().toLowerCase();
     let result = columns.filter((col) => {
       if (!query) return true;
@@ -42,10 +44,8 @@ export default function ColumnsView() {
       return matchTitle || matchDesc || matchCategory || matchTags;
     });
 
-    // 2. 排序處理
     return result.sort((a, b) => {
       if (sortBy === 'favorite') {
-        // 先按我的最愛置頂，再按更新時間
         if (a.isFavorite !== b.isFavorite) {
           return a.isFavorite ? -1 : 1;
         }
@@ -73,7 +73,6 @@ export default function ColumnsView() {
     });
   }, [columns, searchQuery, sortBy]);
 
-  // 最愛專欄數量
   const favoriteCount = useMemo(() => columns.filter(c => c.isFavorite).length, [columns]);
 
   if (selectedColumnId) {
@@ -82,6 +81,52 @@ export default function ColumnsView() {
 
   return (
     <div className="space-y-4 sm:space-y-5 animate-fade-in pb-12">
+      
+      {/* ⭐ 頂端：同人展/場次攤位對照圖區塊 ⭐ */}
+      <div className="bg-white rounded-lg border border-[#4c4993]/30 overflow-hidden shadow-xs">
+        <div
+          onClick={() => setShowBoothMap(!showBoothMap)}
+          className="px-4 py-3 bg-gradient-to-r from-[#161348] to-[#2d287d] text-white flex items-center justify-between cursor-pointer hover:bg-opacity-90 transition select-none"
+        >
+          <div className="flex items-center space-x-2">
+            <MapPin className="w-4 h-4 text-[#a1cdc4] animate-pulse" />
+            <h3 className="text-xs sm:text-sm font-black tracking-tight">
+              📍 展場攤位對照圖 (C / D / E 區 攤位號碼表)
+            </h3>
+          </div>
+
+          <div className="flex items-center space-x-2 text-xs font-bold text-[#a1cdc4]">
+            <span>{showBoothMap ? '點擊收合' : '點擊展開查看'}</span>
+            {showBoothMap ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+          </div>
+        </div>
+
+        {showBoothMap && (
+          <div className="p-3 sm:p-4 bg-[#f4f5f1] border-t border-[#4c4993]/20 flex flex-col items-center justify-center animate-fade-in">
+            <div className="relative group max-w-xl w-full rounded-lg overflow-hidden border border-[#bfc9eb] bg-white shadow-xs">
+              <img
+                src="/booth_map.jpg"
+                alt="展場攤位對照圖 (C, D, E 區)"
+                className="w-full h-auto object-contain max-h-[480px] mx-auto block cursor-pointer"
+                onClick={() => setLightboxImage({ url: '/booth_map.jpg', caption: '📍 展場攤位對照圖 (C / D / E 區)' })}
+              />
+              <div
+                onClick={() => setLightboxImage({ url: '/booth_map.jpg', caption: '📍 展場攤位對照圖 (C / D / E 區)' })}
+                className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition flex items-center justify-center cursor-pointer"
+              >
+                <span className="bg-[#161348] text-white text-xs font-black px-3 py-1.5 rounded-md flex items-center gap-1.5 shadow-lg">
+                  <Maximize2 className="w-3.5 h-3.5 text-[#a1cdc4]" />
+                  點擊放大對照圖
+                </span>
+              </div>
+            </div>
+            <p className="text-[10px] text-[#4c4993]/80 font-bold mt-2 text-center">
+              💡 提示：點擊圖片可放大全螢幕查看或在新分頁中開啟對照
+            </p>
+          </div>
+        )}
+      </div>
+
       {/* 標題與搜尋/動作區 */}
       <div className="bg-gradient-to-r from-[#f4f5f1] via-[#e8ebf7] to-[#d6dedf] p-4 sm:p-5 rounded-lg border border-[#bfc9eb] shadow-xs space-y-3.5">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -120,7 +165,7 @@ export default function ColumnsView() {
           </div>
         </div>
 
-        {/* ⭐ 專欄關鍵字搜尋列 & 排序過濾下拉選單 ⭐ */}
+        {/* 專欄關鍵字搜尋列 & 排序過濾下拉選單 */}
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 pt-1 border-t border-[#4c4993]/15">
           {/* 搜尋框 */}
           <div className="relative flex-1">
@@ -240,7 +285,7 @@ export default function ColumnsView() {
                     </span>
                   </div>
 
-                  {/* ⭐ 頂部右側：我的最愛愛心按鈕 ⭐ */}
+                  {/* 頂部右側：我的最愛愛心按鈕 */}
                   <button
                     type="button"
                     onClick={(e) => handleToggleFavorite(col.id, e)}
