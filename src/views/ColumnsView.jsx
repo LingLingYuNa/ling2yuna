@@ -2,7 +2,9 @@ import React, { useState, useMemo, useLayoutEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import ColumnDetailView from './ColumnDetailView';
 import ExcelImportModal from '../components/ExcelImportModal';
-import { Plus, FolderHeart, ArrowRight, Sparkles, Image as ImageIcon, FileSpreadsheet, ArrowUpDown, Clock, RefreshCw, Heart, Search, X, MapPin, ChevronDown, ChevronUp, Maximize2 } from 'lucide-react';
+import { generateAllColumnsTextReport, downloadTextFile, exportCommentsToExcel } from '../utils/exportUtils';
+import { getCommentsByColumn } from '../db/indexedDB';
+import { Plus, FolderHeart, ArrowRight, Sparkles, Image as ImageIcon, FileSpreadsheet, ArrowUpDown, Clock, RefreshCw, Heart, Search, X, MapPin, ChevronDown, ChevronUp, Maximize2, Download, FileText, Copy, Check } from 'lucide-react';
 
 export default function ColumnsView() {
   const { columns, selectedColumnId, setSelectedColumnId, setIsColumnModalOpen, setEditingColumn, handleToggleFavorite, setLightboxImage } = useApp();
@@ -14,6 +16,11 @@ export default function ColumnsView() {
   // 專欄搜尋與排序模式
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState('updated_desc');
+
+  // 全站導出選單狀態
+  const [isExportMenuOpen, setIsExportMenuOpen] = useState(false);
+  const [copiedText, setCopiedText] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
 
   // 自動恢復回到上一頁時的滾動位置
   useLayoutEffect(() => {
@@ -29,6 +36,59 @@ export default function ColumnsView() {
       }
     }
   }, [selectedColumnId]);
+
+  // ⭐ 全站專欄名與留言導出處理函數 ⭐
+  const fetchAllCommentsMap = async () => {
+    const commentsMap = {};
+    for (const col of columns) {
+      const cmts = await getCommentsByColumn(col.id);
+      commentsMap[col.id] = cmts;
+    }
+    return commentsMap;
+  };
+
+  const handleExportAllTXT = async () => {
+    setIsExporting(true);
+    try {
+      const commentsMap = await fetchAllCommentsMap();
+      const reportText = generateAllColumnsTextReport(columns, commentsMap);
+      downloadTextFile(`CollectTrack_全專欄留言總匯.txt`, reportText);
+    } catch (err) {
+      console.error('Export error:', err);
+    } finally {
+      setIsExporting(false);
+      setIsExportMenuOpen(false);
+    }
+  };
+
+  const handleExportAllExcel = async () => {
+    setIsExporting(true);
+    try {
+      const commentsMap = await fetchAllCommentsMap();
+      exportCommentsToExcel(`CollectTrack_全專欄留言總匯.xlsx`, columns, commentsMap);
+    } catch (err) {
+      console.error('Export error:', err);
+    } finally {
+      setIsExporting(false);
+      setIsExportMenuOpen(false);
+    }
+  };
+
+  const handleCopyAllText = async () => {
+    setIsExporting(true);
+    try {
+      const commentsMap = await fetchAllCommentsMap();
+      const reportText = generateAllColumnsTextReport(columns, commentsMap);
+      await navigator.clipboard.writeText(reportText);
+      setCopiedText(true);
+      setTimeout(() => setCopiedText(false), 2500);
+    } catch (err) {
+      console.error('Copy error:', err);
+    } finally {
+      setIsExporting(false);
+      setIsExportMenuOpen(false);
+    }
+  };
 
   // 計算即時過濾 (搜尋關鍵字) 與動態排序後的專欄列表
   const filteredAndSortedColumns = useMemo(() => {
@@ -82,7 +142,7 @@ export default function ColumnsView() {
   return (
     <div className="space-y-4 sm:space-y-5 animate-fade-in pb-12">
       
-      {/* ⭐ 頂端：同人展/場次攤位對照圖區塊 ⭐ */}
+      {/* 頂端：同人展/場次攤位對照圖區塊 */}
       <div className="bg-white rounded-lg border border-[#4c4993]/30 overflow-hidden shadow-xs">
         <div
           onClick={() => setShowBoothMap(!showBoothMap)}
@@ -143,6 +203,46 @@ export default function ColumnsView() {
           </div>
 
           <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
+            {/* ⭐ 全站匯出專欄與留言選單 ⭐ */}
+            <div className="relative">
+              <button
+                onClick={() => setIsExportMenuOpen(!isExportMenuOpen)}
+                disabled={isExporting}
+                className="bg-[#a1cdc4] hover:bg-[#8ebfb5] text-[#161348] font-black text-xs px-3 py-1.5 rounded-lg border border-[#a1cdc4] transition flex items-center gap-1.5 cursor-pointer shadow-xs disabled:opacity-50"
+                title="只導出專欄名稱與內部留言內容"
+              >
+                <Download className="w-3.5 h-3.5 text-[#161348]" />
+                <span>{copiedText ? '已複製全部內容！' : '導出專欄與留言'}</span>
+                <ChevronDown className="w-3 h-3 text-[#161348]" />
+              </button>
+
+              {isExportMenuOpen && (
+                <div className="absolute right-0 mt-1 w-52 bg-white border border-[#4c4993]/30 rounded-lg shadow-lg z-30 overflow-hidden animate-fade-in py-1">
+                  <button
+                    onClick={handleExportAllTXT}
+                    className="w-full text-left px-3 py-2 text-xs font-bold text-[#161348] hover:bg-[#f4f5f1] flex items-center gap-2 cursor-pointer"
+                  >
+                    <FileText className="w-3.5 h-3.5 text-[#4c4993]" />
+                    <span>導出全部留言 TXT (.txt)</span>
+                  </button>
+                  <button
+                    onClick={handleExportAllExcel}
+                    className="w-full text-left px-3 py-2 text-xs font-bold text-[#161348] hover:bg-[#f4f5f1] flex items-center gap-2 cursor-pointer"
+                  >
+                    <FileSpreadsheet className="w-3.5 h-3.5 text-[#4c4993]" />
+                    <span>導出全部留言 Excel (.xlsx)</span>
+                  </button>
+                  <button
+                    onClick={handleCopyAllText}
+                    className="w-full text-left px-3 py-2 text-xs font-bold text-[#161348] hover:bg-[#f4f5f1] flex items-center gap-2 cursor-pointer border-t border-[#4c4993]/10"
+                  >
+                    {copiedText ? <Check className="w-3.5 h-3.5 text-green-600" /> : <Copy className="w-3.5 h-3.5 text-[#4c4993]" />}
+                    <span>複製全部專欄與留言文字</span>
+                  </button>
+                </div>
+              )}
+            </div>
+
             <button
               onClick={() => setIsExcelModalOpen(true)}
               className="bg-[#f4f5f1] hover:bg-white text-[#4c4993] font-black text-xs px-3 py-1.5 rounded-lg border border-[#4c4993]/30 transition flex items-center gap-1.5 cursor-pointer shadow-xs"

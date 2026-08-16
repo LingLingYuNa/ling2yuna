@@ -1,12 +1,14 @@
 import React, { useState, useMemo } from 'react';
 import { useApp } from '../context/AppContext';
 import CommentLedger from '../components/CommentLedger';
-import { ArrowLeft, Plus, Image as ImageIcon, Edit3, Trash2, Maximize2, Calculator, ChevronUp, ChevronDown, CheckSquare, Square, Heart } from 'lucide-react';
+import { generateColumnTextReport, downloadTextFile, exportCommentsToExcel } from '../utils/exportUtils';
+import { ArrowLeft, Plus, Image as ImageIcon, Edit3, Trash2, Maximize2, Calculator, ChevronUp, ChevronDown, CheckSquare, Square, Heart, Download, FileText, FileSpreadsheet, Copy, Check } from 'lucide-react';
 
 export default function ColumnDetailView() {
   const {
     currentColumn,
     setSelectedColumnId,
+    columnComments,
     columnImages,
     columnTotalAmount,
     columnTotalQty,
@@ -27,6 +29,10 @@ export default function ColumnDetailView() {
   // 展圖批次選擇刪除模式
   const [isSelectMode, setIsSelectMode] = useState(false);
   const [selectedImageIds, setSelectedImageIds] = useState([]);
+
+  // 導出功能選單狀態
+  const [isExportMenuOpen, setIsExportMenuOpen] = useState(false);
+  const [copiedText, setCopiedText] = useState(false);
 
   // Pinterest 雙欄【左一、右二】真瀑布流 (True Masonry) 分拆
   const leftColumnImages = useMemo(
@@ -70,6 +76,30 @@ export default function ColumnDetailView() {
     await handleDeleteImagesBatch(selectedImageIds);
     setSelectedImageIds([]);
     setIsSelectMode(false);
+  };
+
+  // ⭐ 導出此專欄名稱與留言為 TXT ⭐
+  const handleExportTXT = () => {
+    const reportText = generateColumnTextReport(currentColumn, columnComments);
+    const filename = `${currentColumn.title || '專欄留言'}_留言清單.txt`;
+    downloadTextFile(filename, reportText);
+    setIsExportMenuOpen(false);
+  };
+
+  // ⭐ 導出此專欄名稱與留言為 Excel (.xlsx) ⭐
+  const handleExportExcel = () => {
+    const filename = `${currentColumn.title || '專欄留言'}_留言清單.xlsx`;
+    exportCommentsToExcel(filename, [currentColumn], { [currentColumn.id]: columnComments });
+    setIsExportMenuOpen(false);
+  };
+
+  // ⭐ 一鍵複製此專欄名稱與留言文字到剪貼簿 ⭐
+  const handleCopyText = async () => {
+    const reportText = generateColumnTextReport(currentColumn, columnComments);
+    await navigator.clipboard.writeText(reportText);
+    setCopiedText(true);
+    setTimeout(() => setCopiedText(false), 2500);
+    setIsExportMenuOpen(false);
   };
 
   // 單張照片卡片渲染子組件
@@ -141,7 +171,46 @@ export default function ColumnDetailView() {
         </button>
 
         <div className="flex items-center space-x-2">
-          {/* ⭐ 切換我的最愛按鈕 ⭐ */}
+          {/* ⭐ 匯出專欄名稱與留言選單 ⭐ */}
+          <div className="relative">
+            <button
+              onClick={() => setIsExportMenuOpen(!isExportMenuOpen)}
+              className="inline-flex items-center gap-1.5 text-[#161348] text-xs font-black bg-[#a1cdc4] hover:bg-[#8ebfb5] px-3 py-1.5 rounded-lg border border-[#a1cdc4] transition cursor-pointer shadow-xs"
+              title="匯出專欄名稱與留言記帳內容"
+            >
+              <Download className="w-3.5 h-3.5 text-[#161348]" />
+              <span>{copiedText ? '已複製內容！' : '匯出留言文案'}</span>
+              <ChevronDown className="w-3 h-3 text-[#161348]" />
+            </button>
+
+            {isExportMenuOpen && (
+              <div className="absolute right-0 mt-1 w-48 bg-white border border-[#4c4993]/30 rounded-lg shadow-lg z-30 overflow-hidden animate-fade-in py-1">
+                <button
+                  onClick={handleExportTXT}
+                  className="w-full text-left px-3 py-2 text-xs font-bold text-[#161348] hover:bg-[#f4f5f1] flex items-center gap-2 cursor-pointer"
+                >
+                  <FileText className="w-3.5 h-3.5 text-[#4c4993]" />
+                  <span>導出 TXT 文字檔 (.txt)</span>
+                </button>
+                <button
+                  onClick={handleExportExcel}
+                  className="w-full text-left px-3 py-2 text-xs font-bold text-[#161348] hover:bg-[#f4f5f1] flex items-center gap-2 cursor-pointer"
+                >
+                  <FileSpreadsheet className="w-3.5 h-3.5 text-[#4c4993]" />
+                  <span>導出 Excel 表格 (.xlsx)</span>
+                </button>
+                <button
+                  onClick={handleCopyText}
+                  className="w-full text-left px-3 py-2 text-xs font-bold text-[#161348] hover:bg-[#f4f5f1] flex items-center gap-2 cursor-pointer border-t border-[#4c4993]/10"
+                >
+                  {copiedText ? <Check className="w-3.5 h-3.5 text-green-600" /> : <Copy className="w-3.5 h-3.5 text-[#4c4993]" />}
+                  <span>複製留言文字到剪貼簿</span>
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* 切換我的最愛按鈕 */}
           <button
             onClick={(e) => handleToggleFavorite(currentColumn.id, e)}
             className="inline-flex items-center gap-1.5 text-[#4c4993] text-xs font-black bg-[#f4f5f1] hover:bg-white px-3 py-1.5 rounded-lg border border-[#4c4993]/30 transition cursor-pointer shadow-xs"
@@ -368,7 +437,7 @@ export default function ColumnDetailView() {
             </div>
           </div>
 
-          {/* ⭐ 經典 Pinterest 雙欄【左一、右二】真實原圖比例瀑布流 (True Masonry) ⭐ */}
+          {/* 經典 Pinterest 雙欄【左一、右二】真實原圖比例瀑布流 (True Masonry) */}
           {columnImages.length === 0 ? (
             <div className="bg-[#f4f5f1] rounded-lg p-8 text-center border border-dashed border-[#4c4993]/40">
               <ImageIcon className="w-10 h-10 text-[#4c4993]/50 mx-auto mb-2" />
