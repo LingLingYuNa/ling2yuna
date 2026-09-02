@@ -146,6 +146,75 @@ export function AppProvider({ children }) {
     refreshColumns();
   }, []);
 
+  // ⭐ 匯出全站全量備份 JSON (供 Google Drive 同步使用) ⭐
+  const exportFullBackupJSON = async () => {
+    const allCols = await getAllColumns();
+    const allFolds = await getAllFolders();
+
+    const allComments = [];
+    const allImages = [];
+
+    for (const col of allCols) {
+      const cmts = await getCommentsByColumn(col.id);
+      const imgs = await getImagesByColumn(col.id);
+      allComments.push(...cmts);
+      allImages.push(...imgs);
+    }
+
+    return {
+      version: '2.0',
+      system: 'CollectTrack',
+      exportedAt: new Date().toISOString(),
+      folders: allFolds,
+      columns: allCols,
+      comments: allComments,
+      images: allImages
+    };
+  };
+
+  // ⭐ 接收全量備份 JSON 物件，覆蓋還原全站數據 ⭐
+  const importFullBackupJSON = async (backupData) => {
+    if (!backupData || (!backupData.columns && !backupData.folders)) {
+      throw new Error('無效的備份檔案格式');
+    }
+
+    // 1. 完全清空現有資料
+    await clearAllData();
+
+    // 2. 恢復資料夾
+    if (backupData.folders && Array.isArray(backupData.folders)) {
+      for (const fold of backupData.folders) {
+        await dbSaveFolder(fold);
+      }
+    }
+
+    // 3. 恢復專欄
+    if (backupData.columns && Array.isArray(backupData.columns)) {
+      for (const col of backupData.columns) {
+        await saveColumn(col);
+      }
+    }
+
+    // 4. 恢復留言記帳
+    if (backupData.comments && Array.isArray(backupData.comments)) {
+      for (const cmt of backupData.comments) {
+        await dbSaveComment(cmt);
+      }
+    }
+
+    // 5. 恢復展圖
+    if (backupData.images && Array.isArray(backupData.images)) {
+      for (const img of backupData.images) {
+        await dbSaveImage(img);
+      }
+    }
+
+    // 6. 重新刷新狀態
+    await refreshColumns();
+    setSelectedColumnId(null);
+    setSelectedFolderId('ALL');
+  };
+
   // 📁 新增或編輯場次資料夾
   const handleSaveFolder = async (folderData) => {
     const newFolder = {
@@ -510,6 +579,8 @@ export function AppProvider({ children }) {
         setLightboxImage,
 
         // Actions
+        exportFullBackupJSON,
+        importFullBackupJSON,
         handleSaveFolder,
         handleDeleteFolder,
         handleMoveAllColumnsBetweenFolders,
@@ -534,7 +605,7 @@ export function AppProvider({ children }) {
 
       {/* 雙擊返回鍵退出提示 Toast */}
       {exitToastVisible && (
-        <div className="fixed bottom-16 left-1/2 -translate-x-1/2 z-50 bg-[#161348] text-white text-xs font-black px-4 py-2 rounded-full shadow-lg border border-[#a1cdc4] animate-bounce">
+        <div className="fixed bottom-16 left-1/2 -translate-x-1/2 z-50 bg-[#161348] text-[#ffffff] text-xs font-black px-4 py-2 rounded-full shadow-lg border border-[#a1cdc4] animate-bounce">
           再按一次返回鍵退出 CollectTrack
         </div>
       )}
