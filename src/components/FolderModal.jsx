@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
-import { X, FolderPlus, FolderCheck, ArrowRightLeft, Folder, Check, AlertCircle } from 'lucide-react';
+import { X, FolderPlus, FolderCheck, ArrowRightLeft, Check } from 'lucide-react';
 
 export default function FolderModal({ isOpen, onClose, editingFolder = null }) {
   const { folders, columns, handleSaveFolder, handleMoveAllColumnsBetweenFolders, handleSaveColumn, setEditingFolder } = useApp();
@@ -31,14 +31,19 @@ export default function FolderModal({ isOpen, onClose, editingFolder = null }) {
 
   if (!isOpen) return null;
 
-  // 統一的安全關閉彈窗函數
-  const handleModalClose = () => {
+  // ⭐ 徹底防止表單提交與冒泡的安全關閉函數 ⭐
+  const handleModalClose = (e) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
     if (setEditingFolder) setEditingFolder(null);
     onClose();
   };
 
   const handleSubmit = (e) => {
     e.preventDefault();
+    e.stopPropagation();
     if (!name.trim()) return;
 
     handleSaveFolder({
@@ -48,11 +53,15 @@ export default function FolderModal({ isOpen, onClose, editingFolder = null }) {
       createdAt: editingFolder?.createdAt
     });
 
-    handleModalClose();
+    handleModalClose(e);
   };
 
   // 處理批量轉移所有專欄至另一個資料夾
-  const handleBulkTransfer = async () => {
+  const handleBulkTransfer = async (e) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
     if (!editingFolder) return;
     if (folderColumns.length === 0) {
       alert('此資料夾內沒有專欄可供轉移！');
@@ -73,7 +82,11 @@ export default function FolderModal({ isOpen, onClose, editingFolder = null }) {
   };
 
   // 將單個專欄精準移出場次資料夾
-  const handleRemoveSingleColumnFromFolder = async (columnObj) => {
+  const handleRemoveSingleColumnFromFolder = async (e, columnObj) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
     await handleSaveColumn({
       id: columnObj.id,
       title: columnObj.title,
@@ -230,7 +243,7 @@ export default function FolderModal({ isOpen, onClose, editingFolder = null }) {
                         <span className="truncate max-w-[240px]">{col.title}</span>
                         <button
                           type="button"
-                          onClick={() => handleRemoveSingleColumnFromFolder(col)}
+                          onClick={(e) => handleRemoveSingleColumnFromFolder(e, col)}
                           className="text-[10px] text-[#e11d48] hover:underline font-extrabold cursor-pointer shrink-0 border border-[#e11d48]/30 px-2 py-0.5 rounded bg-red-50"
                         >
                           移出場次
