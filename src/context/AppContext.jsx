@@ -20,8 +20,12 @@ import { parseLedgerComment } from '../utils/ledgerParser';
 import {
   getSavedGoogleUser,
   uploadToGoogleDrive,
+  downloadFromGoogleDrive,
+  findBackupFile,
   getAutoSyncEnabled,
-  setAutoSyncEnabled as saveAutoSyncSetting
+  setAutoSyncEnabled as saveAutoSyncSetting,
+  getAutoDownloadEnabled,
+  setAutoDownloadEnabled as saveAutoDownloadSetting
 } from '../utils/googleDriveSync';
 
 const AppContext = createContext();
@@ -31,14 +35,20 @@ export function AppProvider({ children }) {
   const [folders, setFolders] = useState([]);
   const [selectedFolderId, setSelectedFolderId] = useState('ALL'); // 'ALL' 頁籤代表全部專欄
   
-  // 自動雲端同步狀態
+  // 自動雲端同步與自動還原狀態
   const [isAutoSyncEnabled, setIsAutoSyncEnabledState] = useState(getAutoSyncEnabled);
-  const [autoSyncStatus, setAutoSyncStatus] = useState(''); // 'syncing' | 'synced' | ''
+  const [isAutoDownloadEnabled, setIsAutoDownloadEnabledState] = useState(getAutoDownloadEnabled);
+  const [autoSyncStatus, setAutoSyncStatus] = useState(''); // 'syncing' | 'synced' | 'restoring' | 'restored' | ''
   const syncTimerRef = useRef(null);
 
   const setIsAutoSyncEnabled = (enabled) => {
     saveAutoSyncSetting(enabled);
     setIsAutoSyncEnabledState(enabled);
+  };
+
+  const setIsAutoDownloadEnabled = (enabled) => {
+    saveAutoDownloadSetting(enabled);
+    setIsAutoDownloadEnabledState(enabled);
   };
 
   // 雙擊退出提示 Toast
@@ -190,6 +200,9 @@ export function AppProvider({ children }) {
 
   // ⭐ 觸發自動背景雲端同步 (靜默帶 3 秒 Debounce) ⭐
   const triggerAutoCloudSync = () => {
+    // 記錄本機最後修改時間
+    localStorage.setItem('collecttrack_local_last_modified', new Date().toISOString());
+
     if (!isAutoSyncEnabled) return;
     const googleUser = getSavedGoogleUser();
     if (!googleUser) return; // 未登入 Google 帳號不觸發
@@ -251,6 +264,48 @@ export function AppProvider({ children }) {
     setSelectedColumnId(null);
     setSelectedFolderId('ALL');
   };
+
+  // ⭐ 首屏自動偵測 Google 雲端是否有來自其他設備的新數據並自動還原 ⭐
+  useEffect(() => {
+    if (!isAutoDownloadEnabled) return;
+    const googleUser = getSavedGoogleUser();
+    if (!googleUser) return;
+
+    let isMounted = true;
+    const checkAndAutoRestore = async () => {
+      try {
+        const fileObj = await findBackupFile();
+        if (!fileObj || !fileObj.modifiedTime) return;
+
+        const cloudModifiedTime = new Date(fileObj.modifiedTime).getTime();
+        const localModifiedTimeStr = localStorage.getItem('collecttrack_local_last_modified');
+        const localModifiedTime = localModifiedTimeStr ? new Date(localModifiedTimeStr).getTime() : 0;
+
+        // 如果雲端的最後修改時間明確大於本機的修改時間 (差值 > 5 秒防止自己剛上傳的時差)
+        if (cloudModifiedTime - localModifiedTime > 5000) {
+          if (isMounted) setAutoSyncStatus('restoring');
+          
+          const { backupDataObj } = await downloadFromGoogleDrive();
+          await importFullBackupJSON(backupDataObj);
+
+          if (isMounted) {
+            setAutoSyncStatus('restored');
+            setTimeout(() => setAutoSyncStatus(''), 4000);
+          }
+        }
+      } catch (err) {
+        console.warn('Auto restore check notice:', err);
+        if (isMounted) setAutoSyncStatus('');
+      }
+    };
+
+    // 在頁面載入 1.5 秒後進行靜默檢查
+    const timer = setTimeout(checkAndAutoRestore, 1500);
+    return () => {
+      isMounted = false;
+      clearTimeout(timer);
+    };
+  }, [isAutoDownloadEnabled]);
 
   // 📁 新增或編輯場次資料夾
   const handleSaveFolder = async (folderData) => {
@@ -617,9 +672,11 @@ export function AppProvider({ children }) {
         columnTotalQty,
         columnLedgerItemsCount,
         
-        // 自動雲端同步
+        // 自動雲端同步與自動還原
         isAutoSyncEnabled,
         setIsAutoSyncEnabled,
+        isAutoDownloadEnabled,
+        setIsAutoDownloadEnabled,
         autoSyncStatus,
 
         // Modals
@@ -669,7 +726,7 @@ export function AppProvider({ children }) {
         </div>
       )}
 
-      {/* ☁️ 靜默自動背景雲端同步狀態 Toast 提示 */}
+      {/* ☁️ 靜默自動背景雲端同步 / 還原狀態 Toast 提示 */}
       {autoSyncStatus && (
         <div className="fixed bottom-5 right-5 z-50 bg-[#161348] text-[#a1cdc4] text-xs font-black px-3.5 py-2 rounded-lg shadow-xl border border-[#a1cdc4] flex items-center gap-2 animate-slide-up">
           {autoSyncStatus === 'syncing' ? (
@@ -677,12 +734,22 @@ export function AppProvider({ children }) {
               <div className="w-3 h-3 rounded-full border-2 border-[#a1cdc4] border-t-transparent animate-spin" />
               <span>☁️ 正在自動同步最新資料至 Google 雲端...</span>
             </>
-          ) : (
+          ) : autoSyncStatus === 'synced' ? (
             <>
               <span className="text-green-400">✓</span>
               <span className="text-white">☁️ 最新變更已自動同步至 Google 雲端！</span>
             </>
-          )}
+          ) : autoSyncStatus === 'restoring' ? (
+            <>
+              <div className="w-3 h-3 rounded-full border-2 border-[#a1cdc4] border-t-transparent animate-spin" />
+              <span>☁️ 偵測到雲端有跨設備最新資料，正在自動拉取還原...</span>
+            </>
+          ) : autoSyncStatus === 'restored' ? (
+            <>
+              <span className="text-[#a1cdc4]">🎉</span>
+              <span className="text-white">☁️ 已自動為您同步還原來自其他設備的最新數據！</span>
+            </>
+          ) : null}
         </div>
       )}
     </AppContext.Provider>

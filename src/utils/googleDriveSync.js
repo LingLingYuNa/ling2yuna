@@ -6,14 +6,24 @@ const BACKUP_FILENAME = 'collecttrack_backup.json';
 let tokenClient = null;
 let accessToken = null;
 
-// 自動背景同步開關狀態
+// 自動背景上傳開關狀態
 export function getAutoSyncEnabled() {
   const val = localStorage.getItem('collecttrack_gdrive_auto_sync');
-  return val === null ? true : val === 'true'; // 預設開啟自動背景同步
+  return val === null ? true : val === 'true';
 }
 
 export function setAutoSyncEnabled(enabled) {
   localStorage.setItem('collecttrack_gdrive_auto_sync', enabled ? 'true' : 'false');
+}
+
+// ⭐ 自動下載還原開關狀態 ⭐
+export function getAutoDownloadEnabled() {
+  const val = localStorage.getItem('collecttrack_gdrive_auto_download');
+  return val === null ? true : val === 'true'; // 預設開啟自動下載還原
+}
+
+export function setAutoDownloadEnabled(enabled) {
+  localStorage.setItem('collecttrack_gdrive_auto_download', enabled ? 'true' : 'false');
 }
 
 // 取得或設定自訂的 Client ID
@@ -133,12 +143,15 @@ function getValidToken() {
 }
 
 // 尋找 appDataFolder 中的備份檔案
-async function findBackupFile(token) {
+export async function findBackupFile(token) {
+  const authToken = token || getValidToken();
+  if (!authToken) return null;
+
   try {
     const res = await fetch(
       `https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&q=name='${BACKUP_FILENAME}'&fields=files(id,name,modifiedTime,size)`,
       {
-        headers: { Authorization: `Bearer ${token}` }
+        headers: { Authorization: `Bearer ${authToken}` }
       }
     );
     if (!res.ok) {
@@ -207,6 +220,7 @@ export async function uploadToGoogleDrive(backupDataObj) {
   const resultFile = await res.json();
   const nowStr = new Date().toISOString();
   localStorage.setItem('collecttrack_gdrive_last_sync', nowStr);
+  localStorage.setItem('collecttrack_local_last_modified', nowStr);
   return { file: resultFile, syncTime: nowStr };
 }
 
@@ -232,6 +246,10 @@ export async function downloadFromGoogleDrive() {
 
   const backupDataObj = await res.json();
   const nowStr = new Date().toISOString();
+  const cloudTime = existingFile.modifiedTime || backupDataObj.exportedAt || nowStr;
+
   localStorage.setItem('collecttrack_gdrive_last_sync', nowStr);
-  return { backupDataObj, modifiedTime: existingFile.modifiedTime || nowStr };
+  localStorage.setItem('collecttrack_local_last_modified', cloudTime);
+
+  return { backupDataObj, modifiedTime: cloudTime };
 }

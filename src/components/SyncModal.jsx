@@ -9,10 +9,17 @@ import {
   getSavedClientId,
   saveClientId
 } from '../utils/googleDriveSync';
-import { X, Cloud, Download, Upload, RefreshCw, Check, AlertCircle, FileJson, Copy, ShieldCheck, LogOut, Settings, ExternalLink, Key, HelpCircle, Zap } from 'lucide-react';
+import { X, Cloud, Download, Upload, RefreshCw, Check, AlertCircle, FileJson, Copy, ShieldCheck, LogOut, Settings, ExternalLink, Key, HelpCircle, Zap, ArrowDownCircle } from 'lucide-react';
 
 export default function SyncModal({ isOpen, onClose }) {
-  const { exportFullBackupJSON, importFullBackupJSON, isAutoSyncEnabled, setIsAutoSyncEnabled } = useApp();
+  const {
+    exportFullBackupJSON,
+    importFullBackupJSON,
+    isAutoSyncEnabled,
+    setIsAutoSyncEnabled,
+    isAutoDownloadEnabled,
+    setIsAutoDownloadEnabled
+  } = useApp();
 
   // Google Drive 同步狀態
   const [googleUser, setGoogleUser] = useState(null);
@@ -252,26 +259,50 @@ export default function SyncModal({ isOpen, onClose }) {
               </div>
             </div>
 
-            {/* ⭐ 自動背景同步 Toggle 開關區 ⭐ */}
+            {/* ⭐ 自動背景同步 & 自動下載還原控制開關區 ⭐ */}
             {googleUser && (
-              <div className="bg-white/10 p-2.5 rounded-lg flex items-center justify-between backdrop-blur-xs border border-white/15">
-                <div className="flex items-center space-x-2">
-                  <Zap className="w-4 h-4 text-[#a1cdc4] animate-pulse" />
-                  <div>
-                    <span className="text-xs font-black text-white block">資料變動時自動背景同步</span>
-                    <span className="text-[10px] text-[#a1cdc4] font-bold block">記帳、新增專欄與照片時默默自動備份</span>
+              <div className="bg-white/10 p-2.5 rounded-lg space-y-2 backdrop-blur-xs border border-white/15">
+                {/* 1. 上傳開關 */}
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    <Zap className="w-3.5 h-3.5 text-[#a1cdc4]" />
+                    <div>
+                      <span className="text-xs font-black text-white block">資料變動時自動背景上傳</span>
+                      <span className="text-[9px] text-[#a1cdc4] font-bold block">本機記帳與修改自動默默備份</span>
+                    </div>
                   </div>
+
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={isAutoSyncEnabled}
+                      onChange={(e) => setIsAutoSyncEnabled(e.target.checked)}
+                      className="sr-only peer"
+                    />
+                    <div className="w-8 h-4 bg-white/30 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-[#a1cdc4]"></div>
+                  </label>
                 </div>
 
-                <label className="relative inline-flex items-center cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={isAutoSyncEnabled}
-                    onChange={(e) => setIsAutoSyncEnabled(e.target.checked)}
-                    className="sr-only peer"
-                  />
-                  <div className="w-9 h-5 bg-white/30 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[#a1cdc4]"></div>
-                </label>
+                {/* 2. 下載還原開關 */}
+                <div className="flex items-center justify-between pt-1 border-t border-white/10">
+                  <div className="flex items-center space-x-2">
+                    <ArrowDownCircle className="w-3.5 h-3.5 text-[#a1cdc4]" />
+                    <div>
+                      <span className="text-xs font-black text-white block">偵測到雲端新數據自動下載還原</span>
+                      <span className="text-[9px] text-[#a1cdc4] font-bold block">跨設備開啟網頁時自動拉取最新資料</span>
+                    </div>
+                  </div>
+
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={isAutoDownloadEnabled}
+                      onChange={(e) => setIsAutoDownloadEnabled(e.target.checked)}
+                      className="sr-only peer"
+                    />
+                    <div className="w-8 h-4 bg-white/30 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-[#a1cdc4]"></div>
+                  </label>
+                </div>
               </div>
             )}
 
@@ -429,7 +460,7 @@ export default function SyncModal({ isOpen, onClose }) {
                     className="bg-white/20 hover:bg-white/30 text-white font-black text-xs py-2 px-3 rounded-md transition shadow-xs flex items-center justify-center gap-1.5 cursor-pointer border border-white/30 disabled:opacity-50"
                   >
                     <Download className="w-3.5 h-3.5 text-[#a1cdc4]" />
-                    <span>{isSyncing ? '下載中...' : '📥 從雲端下載還原'}</span>
+                    <span>{isSyncing ? '下載中...' : '📥 手動從雲端還原'}</span>
                   </button>
                 </div>
               </div>
