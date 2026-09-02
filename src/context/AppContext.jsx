@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import {
   getAllColumns,
   saveColumn,
@@ -17,6 +17,12 @@ import {
   clearAllData
 } from '../db/indexedDB';
 import { parseLedgerComment } from '../utils/ledgerParser';
+import {
+  getSavedGoogleUser,
+  uploadToGoogleDrive,
+  getAutoSyncEnabled,
+  setAutoSyncEnabled as saveAutoSyncSetting
+} from '../utils/googleDriveSync';
 
 const AppContext = createContext();
 
@@ -25,6 +31,16 @@ export function AppProvider({ children }) {
   const [folders, setFolders] = useState([]);
   const [selectedFolderId, setSelectedFolderId] = useState('ALL'); // 'ALL' 頁籤代表全部專欄
   
+  // 自動雲端同步狀態
+  const [isAutoSyncEnabled, setIsAutoSyncEnabledState] = useState(getAutoSyncEnabled);
+  const [autoSyncStatus, setAutoSyncStatus] = useState(''); // 'syncing' | 'synced' | ''
+  const syncTimerRef = useRef(null);
+
+  const setIsAutoSyncEnabled = (enabled) => {
+    saveAutoSyncSetting(enabled);
+    setIsAutoSyncEnabledState(enabled);
+  };
+
   // 雙擊退出提示 Toast
   const [exitToastVisible, setExitToastVisible] = useState(false);
 
@@ -172,6 +188,27 @@ export function AppProvider({ children }) {
     };
   };
 
+  // ⭐ 觸發自動背景雲端同步 (靜默帶 3 秒 Debounce) ⭐
+  const triggerAutoCloudSync = () => {
+    if (!isAutoSyncEnabled) return;
+    const googleUser = getSavedGoogleUser();
+    if (!googleUser) return; // 未登入 Google 帳號不觸發
+
+    if (syncTimerRef.current) clearTimeout(syncTimerRef.current);
+    syncTimerRef.current = setTimeout(async () => {
+      try {
+        setAutoSyncStatus('syncing');
+        const backupData = await exportFullBackupJSON();
+        await uploadToGoogleDrive(backupData);
+        setAutoSyncStatus('synced');
+        setTimeout(() => setAutoSyncStatus(''), 3000);
+      } catch (err) {
+        console.warn('Auto cloud sync notice:', err);
+        setAutoSyncStatus('');
+      }
+    }, 3000);
+  };
+
   // ⭐ 接收全量備份 JSON 物件，覆蓋還原全站數據 ⭐
   const importFullBackupJSON = async (backupData) => {
     if (!backupData || (!backupData.columns && !backupData.folders)) {
@@ -227,6 +264,7 @@ export function AppProvider({ children }) {
     await refreshColumns();
     setSelectedFolderId(newFolder.id);
     closeFolderModal();
+    triggerAutoCloudSync();
   };
 
   // 📁 刪除場次資料夾（歸類回預設未分類）
@@ -243,6 +281,7 @@ export function AppProvider({ children }) {
       setSelectedFolderId('ALL');
     }
     await refreshColumns();
+    triggerAutoCloudSync();
   };
 
   // 📁 一鍵將 A 資料夾裡的所有專欄批量轉移至 B 資料夾
@@ -265,6 +304,7 @@ export function AppProvider({ children }) {
     }
 
     await refreshColumns();
+    triggerAutoCloudSync();
   };
 
   // 📁 將勾選的多個指定專欄一鍵批量歸納轉移至目標資料夾
@@ -284,6 +324,7 @@ export function AppProvider({ children }) {
     }
 
     await refreshColumns();
+    triggerAutoCloudSync();
   };
 
   // 觸發指定專欄的 updatedAt 時間戳記更新
@@ -313,6 +354,7 @@ export function AppProvider({ children }) {
 
     await saveColumn(updatedCol);
     setColumns(prev => prev.map(c => (c.id === colId ? updatedCol : c)));
+    triggerAutoCloudSync();
   };
 
   // 當選擇的專欄變更時，載入關聯的留言記帳與照片
@@ -373,6 +415,7 @@ export function AppProvider({ children }) {
     if (!isEdit) setSelectedColumnId(newCol.id);
     setIsColumnModalOpen(false);
     setEditingColumn(null);
+    triggerAutoCloudSync();
   };
 
   // 刪除單個專欄
@@ -384,6 +427,7 @@ export function AppProvider({ children }) {
     if (selectedColumnId === id) {
       setSelectedColumnId(null);
     }
+    triggerAutoCloudSync();
   };
 
   // 一鍵刪除今天 (或由 Excel 匯入) 的專欄
@@ -411,6 +455,7 @@ export function AppProvider({ children }) {
 
     await refreshColumns();
     alert(`已成功刪除 ${targets.length} 個今天匯入的專欄！`);
+    triggerAutoCloudSync();
   };
 
   // 完全清空所有資料
@@ -423,6 +468,7 @@ export function AppProvider({ children }) {
     setSelectedFolderId('ALL');
     setColumnComments([]);
     setColumnImages([]);
+    triggerAutoCloudSync();
   };
 
   // 新增留言記帳
@@ -442,6 +488,7 @@ export function AppProvider({ children }) {
     await dbSaveComment(newComment);
     setColumnComments(prev => [...prev, newComment]);
     await touchColumnUpdatedAt(selectedColumnId);
+    triggerAutoCloudSync();
   };
 
   // 編輯更新留言記帳
@@ -461,6 +508,7 @@ export function AppProvider({ children }) {
     await dbSaveComment(updatedComment);
     setColumnComments(prev => prev.map(c => (c.id === id ? updatedComment : c)));
     await touchColumnUpdatedAt(selectedColumnId);
+    triggerAutoCloudSync();
   };
 
   // 刪除留言記帳
@@ -468,6 +516,7 @@ export function AppProvider({ children }) {
     await dbDeleteComment(id);
     setColumnComments(prev => prev.filter(c => c.id !== id));
     if (selectedColumnId) await touchColumnUpdatedAt(selectedColumnId);
+    triggerAutoCloudSync();
   };
 
   // 單張新增照片
@@ -484,6 +533,7 @@ export function AppProvider({ children }) {
     setColumnImages(prev => [newImg, ...prev]);
     setIsImageModalOpen(false);
     await touchColumnUpdatedAt(selectedColumnId);
+    triggerAutoCloudSync();
   };
 
   // 批量新增照片
@@ -509,6 +559,7 @@ export function AppProvider({ children }) {
     setColumnImages(prev => [...newImages, ...prev]);
     setIsImageModalOpen(false);
     await touchColumnUpdatedAt(selectedColumnId);
+    triggerAutoCloudSync();
   };
 
   // 單張刪除照片
@@ -518,6 +569,7 @@ export function AppProvider({ children }) {
     setColumnImages(prev => prev.filter(img => img.id !== id));
     if (lightboxImage?.id === id) setLightboxImage(null);
     if (selectedColumnId) await touchColumnUpdatedAt(selectedColumnId);
+    triggerAutoCloudSync();
   };
 
   // 批次一鍵刪除選取的照片
@@ -528,6 +580,7 @@ export function AppProvider({ children }) {
     setColumnImages(prev => prev.filter(img => !ids.includes(img.id)));
     if (lightboxImage && ids.includes(lightboxImage.id)) setLightboxImage(null);
     if (selectedColumnId) await touchColumnUpdatedAt(selectedColumnId);
+    triggerAutoCloudSync();
   };
 
   // 一鍵清空目前專欄的所有展圖
@@ -538,6 +591,7 @@ export function AppProvider({ children }) {
     setColumnImages([]);
     setLightboxImage(null);
     await touchColumnUpdatedAt(selectedColumnId);
+    triggerAutoCloudSync();
   };
 
   // 計算當前專欄留言記帳的總計金額與總件數
@@ -563,6 +617,11 @@ export function AppProvider({ children }) {
         columnTotalQty,
         columnLedgerItemsCount,
         
+        // 自動雲端同步
+        isAutoSyncEnabled,
+        setIsAutoSyncEnabled,
+        autoSyncStatus,
+
         // Modals
         isColumnModalOpen,
         setIsColumnModalOpen,
@@ -605,8 +664,25 @@ export function AppProvider({ children }) {
 
       {/* 雙擊返回鍵退出提示 Toast */}
       {exitToastVisible && (
-        <div className="fixed bottom-16 left-1/2 -translate-x-1/2 z-50 bg-[#161348] text-[#ffffff] text-xs font-black px-4 py-2 rounded-full shadow-lg border border-[#a1cdc4] animate-bounce">
+        <div className="fixed bottom-16 left-1/2 -translate-x-1/2 z-50 bg-[#161348] text-white text-xs font-black px-4 py-2 rounded-full shadow-lg border border-[#a1cdc4] animate-bounce">
           再按一次返回鍵退出 CollectTrack
+        </div>
+      )}
+
+      {/* ☁️ 靜默自動背景雲端同步狀態 Toast 提示 */}
+      {autoSyncStatus && (
+        <div className="fixed bottom-5 right-5 z-50 bg-[#161348] text-[#a1cdc4] text-xs font-black px-3.5 py-2 rounded-lg shadow-xl border border-[#a1cdc4] flex items-center gap-2 animate-slide-up">
+          {autoSyncStatus === 'syncing' ? (
+            <>
+              <div className="w-3 h-3 rounded-full border-2 border-[#a1cdc4] border-t-transparent animate-spin" />
+              <span>☁️ 正在自動同步最新資料至 Google 雲端...</span>
+            </>
+          ) : (
+            <>
+              <span className="text-green-400">✓</span>
+              <span className="text-white">☁️ 最新變更已自動同步至 Google 雲端！</span>
+            </>
+          )}
         </div>
       )}
     </AppContext.Provider>

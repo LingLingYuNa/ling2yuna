@@ -9,10 +9,10 @@ import {
   getSavedClientId,
   saveClientId
 } from '../utils/googleDriveSync';
-import { X, Cloud, Download, Upload, RefreshCw, Check, AlertCircle, FileJson, Copy, ShieldCheck, LogOut, Settings, ExternalLink, Key, HelpCircle } from 'lucide-react';
+import { X, Cloud, Download, Upload, RefreshCw, Check, AlertCircle, FileJson, Copy, ShieldCheck, LogOut, Settings, ExternalLink, Key, HelpCircle, Zap } from 'lucide-react';
 
 export default function SyncModal({ isOpen, onClose }) {
-  const { exportFullBackupJSON, importFullBackupJSON } = useApp();
+  const { exportFullBackupJSON, importFullBackupJSON, isAutoSyncEnabled, setIsAutoSyncEnabled } = useApp();
 
   // Google Drive 同步狀態
   const [googleUser, setGoogleUser] = useState(null);
@@ -252,6 +252,29 @@ export default function SyncModal({ isOpen, onClose }) {
               </div>
             </div>
 
+            {/* ⭐ 自動背景同步 Toggle 開關區 ⭐ */}
+            {googleUser && (
+              <div className="bg-white/10 p-2.5 rounded-lg flex items-center justify-between backdrop-blur-xs border border-white/15">
+                <div className="flex items-center space-x-2">
+                  <Zap className="w-4 h-4 text-[#a1cdc4] animate-pulse" />
+                  <div>
+                    <span className="text-xs font-black text-white block">資料變動時自動背景同步</span>
+                    <span className="text-[10px] text-[#a1cdc4] font-bold block">記帳、新增專欄與照片時默默自動備份</span>
+                  </div>
+                </div>
+
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={isAutoSyncEnabled}
+                    onChange={(e) => setIsAutoSyncEnabled(e.target.checked)}
+                    className="sr-only peer"
+                  />
+                  <div className="w-9 h-5 bg-white/30 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[#a1cdc4]"></div>
+                </label>
+              </div>
+            )}
+
             {/* 提示訊息 Toast */}
             {syncStatusMsg && (
               <div className={`p-2.5 rounded text-xs font-black flex items-center justify-between gap-1.5 ${
@@ -396,7 +419,7 @@ export default function SyncModal({ isOpen, onClose }) {
                     className="bg-[#a1cdc4] hover:bg-[#8ebfb5] text-[#161348] font-black text-xs py-2 px-3 rounded-md transition shadow-xs flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
                   >
                     <Upload className="w-3.5 h-3.5" />
-                    <span>{isSyncing ? '上傳中...' : '📤 上傳最新數據到雲端'}</span>
+                    <span>{isSyncing ? '上傳中...' : '📤 手動立即上傳雲端'}</span>
                   </button>
 
                   <button
@@ -424,13 +447,13 @@ export default function SyncModal({ isOpen, onClose }) {
               <button
                 type="button"
                 onClick={handleDownloadLocalJSON}
-                className="bg-white hover:bg-[#f4f5f1] text-[#4c4993] font-extrabold text-xs py-2 px-3 rounded-md border border-[#bfc9eb] transition shadow-xs flex items-center justify-center gap-1.5 cursor-pointer"
+                className="bg-[#ffffff] hover:bg-[#f4f5f1] text-[#4c4993] font-extrabold text-xs py-2 px-3 rounded-md border border-[#bfc9eb] transition shadow-xs flex items-center justify-center gap-1.5 cursor-pointer"
               >
                 <FileJson className="w-3.5 h-3.5 text-[#4c4993]" />
                 <span>匯出 JSON 備份檔</span>
               </button>
 
-              <label className="bg-white hover:bg-[#f4f5f1] text-[#4c4993] font-extrabold text-xs py-2 px-3 rounded-md border border-[#bfc9eb] transition shadow-xs flex items-center justify-center gap-1.5 cursor-pointer text-center">
+              <label className="bg-[#ffffff] hover:bg-[#f4f5f1] text-[#4c4993] font-extrabold text-xs py-2 px-3 rounded-md border border-[#bfc9eb] transition shadow-xs flex items-center justify-center gap-1.5 cursor-pointer text-center">
                 <Upload className="w-3.5 h-3.5 text-[#4c4993]" />
                 <span>匯入 JSON 還原</span>
                 <input

@@ -6,6 +6,16 @@ const BACKUP_FILENAME = 'collecttrack_backup.json';
 let tokenClient = null;
 let accessToken = null;
 
+// 自動背景同步開關狀態
+export function getAutoSyncEnabled() {
+  const val = localStorage.getItem('collecttrack_gdrive_auto_sync');
+  return val === null ? true : val === 'true'; // 預設開啟自動背景同步
+}
+
+export function setAutoSyncEnabled(enabled) {
+  localStorage.setItem('collecttrack_gdrive_auto_sync', enabled ? 'true' : 'false');
+}
+
 // 取得或設定自訂的 Client ID
 export function getSavedClientId() {
   return localStorage.getItem('collecttrack_gdrive_client_id') || '';
