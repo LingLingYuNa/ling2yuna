@@ -11,6 +11,9 @@ import {
   deleteImage as dbDeleteImage,
   deleteImagesBatch as dbDeleteImagesBatch,
   deleteAllImagesByColumn as dbDeleteAllImagesByColumn,
+  getAllFolders,
+  saveFolder as dbSaveFolder,
+  deleteFolder as dbDeleteFolder,
   clearAllData
 } from '../db/indexedDB';
 import { parseLedgerComment } from '../utils/ledgerParser';
@@ -19,6 +22,8 @@ const AppContext = createContext();
 
 export function AppProvider({ children }) {
   const [columns, setColumns] = useState([]);
+  const [folders, setFolders] = useState([]);
+  const [selectedFolderId, setSelectedFolderId] = useState('ALL'); // 'ALL' 頁籤代表全部專欄
   
   // 雙擊退出提示 Toast
   const [exitToastVisible, setExitToastVisible] = useState(false);
@@ -91,26 +96,64 @@ export function AppProvider({ children }) {
   // Modals & Lightbox 狀態
   const [isColumnModalOpen, setIsColumnModalOpen] = useState(false);
   const [isImageModalOpen, setIsImageModalOpen] = useState(false);
+  const [isFolderModalOpen, setIsFolderModalOpen] = useState(false);
+  const [editingFolder, setEditingFolder] = useState(null);
   const [lightboxImage, setLightboxImage] = useState(null);
   const [editingColumn, setEditingColumn] = useState(null);
 
-  // 載入專欄數據
+  // 載入專欄與資料夾數據
   const refreshColumns = async () => {
     try {
-      const data = await getAllColumns();
-      setColumns(data);
+      const [colData, folderData] = await Promise.all([
+        getAllColumns(),
+        getAllFolders()
+      ]);
+      setColumns(colData);
+      setFolders(folderData);
 
-      if (selectedColumnId && !data.some(c => c.id === selectedColumnId)) {
+      if (selectedColumnId && !colData.some(c => c.id === selectedColumnId)) {
         setSelectedColumnIdState(null);
       }
     } catch (err) {
-      console.error('Failed to load columns:', err);
+      console.error('Failed to load columns/folders:', err);
     }
   };
 
   useEffect(() => {
     refreshColumns();
   }, []);
+
+  // 📁 新增或編輯場次資料夾
+  const handleSaveFolder = async (folderData) => {
+    const newFolder = {
+      id: folderData.id || `folder-${Date.now()}`,
+      name: folderData.name || '未命名場次',
+      description: folderData.description || '',
+      createdAt: folderData.createdAt || new Date().toISOString()
+    };
+    await dbSaveFolder(newFolder);
+    await refreshColumns();
+    setSelectedFolderId(newFolder.id);
+    setIsFolderModalOpen(false);
+    setEditingFolder(null);
+  };
+
+  // 📁 刪除場次資料夾（歸類回預設未分類）
+  const handleDeleteFolder = async (id) => {
+    if (!window.confirm('確定要刪除這個場次資料夾嗎？裡面的專欄將會自動保留並移至未分類！')) return;
+    await dbDeleteFolder(id);
+    
+    // 更新原本歸屬於此 folder 的專欄為未分類
+    const affected = columns.filter(c => c.folderId === id);
+    for (const col of affected) {
+      await saveColumn({ ...col, folderId: null });
+    }
+
+    if (selectedFolderId === id) {
+      setSelectedFolderId('ALL');
+    }
+    await refreshColumns();
+  };
 
   // 觸發指定專欄的 updatedAt 時間戳記更新
   const touchColumnUpdatedAt = async (colId) => {
@@ -125,7 +168,7 @@ export function AppProvider({ children }) {
     setColumns(prev => prev.map(c => (c.id === colId ? updatedCol : c)));
   };
 
-  // ⭐ 切換「我的最愛」狀態 ⭐
+  // 切換「我的最愛」狀態
   const handleToggleFavorite = async (colId, e) => {
     if (e) e.stopPropagation();
     const target = columns.find(c => c.id === colId);
@@ -175,6 +218,7 @@ export function AppProvider({ children }) {
     const now = new Date().toISOString();
     const newCol = {
       id: columnData.id || `col-${Date.now()}`,
+      folderId: columnData.folderId || (selectedFolderId !== 'ALL' && selectedFolderId !== 'UNASSIGNED' ? selectedFolderId : null),
       title: columnData.title || '無標題專欄',
       description: columnData.description || '',
       category: columnData.category || '宣圖',
@@ -207,7 +251,9 @@ export function AppProvider({ children }) {
     if (!window.confirm('確定要清空所有二次元專欄與留言記帳紀錄嗎？此動作無法復原！')) return;
     await clearAllData();
     setColumns([]);
+    setFolders([]);
     setSelectedColumnId(null);
+    setSelectedFolderId('ALL');
     setColumnComments([]);
     setColumnImages([]);
   };
@@ -338,6 +384,9 @@ export function AppProvider({ children }) {
     <AppContext.Provider
       value={{
         columns,
+        folders,
+        selectedFolderId,
+        setSelectedFolderId,
         currentColumn,
         selectedColumnId,
         setSelectedColumnId,
@@ -352,12 +401,18 @@ export function AppProvider({ children }) {
         setIsColumnModalOpen,
         isImageModalOpen,
         setIsImageModalOpen,
+        isFolderModalOpen,
+        setIsFolderModalOpen,
+        editingFolder,
+        setEditingFolder,
         editingColumn,
         setEditingColumn,
         lightboxImage,
         setLightboxImage,
 
         // Actions
+        handleSaveFolder,
+        handleDeleteFolder,
         handleSaveColumn,
         handleDeleteColumn,
         handleResetData,

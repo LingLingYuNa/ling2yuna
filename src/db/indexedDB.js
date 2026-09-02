@@ -1,150 +1,145 @@
 import { openDB } from 'idb';
 
 const DB_NAME = 'CollectTrackDB';
-const DB_VERSION = 1;
+const DB_VERSION = 2; // 升級版本號支援 folders 表
 
 export async function initDB() {
   return openDB(DB_NAME, DB_VERSION, {
-    upgrade(db) {
+    upgrade(db, oldVersion) {
       if (!db.objectStoreNames.contains('columns')) {
-        const columnStore = db.createObjectStore('columns', { keyPath: 'id' });
-        columnStore.createIndex('createdAt', 'createdAt');
+        db.createObjectStore('columns', { keyPath: 'id' });
       }
-
       if (!db.objectStoreNames.contains('comments')) {
         const commentStore = db.createObjectStore('comments', { keyPath: 'id' });
-        commentStore.createIndex('columnId', 'columnId');
-        commentStore.createIndex('imageId', 'imageId');
-        commentStore.createIndex('createdAt', 'createdAt');
+        commentStore.createIndex('columnId', 'columnId', { unique: false });
       }
-
       if (!db.objectStoreNames.contains('images')) {
         const imageStore = db.createObjectStore('images', { keyPath: 'id' });
-        imageStore.createIndex('columnId', 'columnId');
+        imageStore.createIndex('columnId', 'columnId', { unique: false });
       }
-
-      if (!db.objectStoreNames.contains('orders')) {
-        const orderStore = db.createObjectStore('orders', { keyPath: 'id' });
-        orderStore.createIndex('createdAt', 'createdAt');
-      }
-
-      if (!db.objectStoreNames.contains('simpleLedger')) {
-        const ledgerStore = db.createObjectStore('simpleLedger', { keyPath: 'id' });
-        ledgerStore.createIndex('date', 'date');
+      // 新增 folders 資料夾 ObjectStore
+      if (!db.objectStoreNames.contains('folders')) {
+        db.createObjectStore('folders', { keyPath: 'id' });
       }
     },
   });
 }
 
-// 完全清空本地資料庫中現有的所有 Demo 與記錄
-export async function clearAllData() {
+// ---------------- 📁 資料夾 (Folders) ----------------
+export async function getAllFolders() {
   const db = await initDB();
-  const tx = db.transaction(['columns', 'comments', 'images', 'orders', 'simpleLedger'], 'readwrite');
-  await tx.objectStore('columns').clear();
-  await tx.objectStore('comments').clear();
-  await tx.objectStore('images').clear();
-  await tx.objectStore('orders').clear();
-  await tx.objectStore('simpleLedger').clear();
-  await tx.done;
+  return db.getAll('folders');
 }
 
-// 取得所有專欄並附帶各專欄留言記帳總花費金額
+export async function saveFolder(folder) {
+  const db = await initDB();
+  return db.put('folders', folder);
+}
+
+export async function deleteFolder(id) {
+  const db = await initDB();
+  return db.delete('folders', id);
+}
+
+// ---------------- 專欄 (Columns) ----------------
 export async function getAllColumns() {
   const db = await initDB();
-  const list = await db.getAll('columns');
-
-  const listWithTotals = await Promise.all(
-    list.map(async (col) => {
-      const comments = await db.getAllFromIndex('comments', 'columnId', col.id);
-      const totalAmount = comments.reduce((sum, c) => sum + (c.parsed?.total || 0), 0);
-      const totalQty = comments.reduce((sum, c) => sum + (c.parsed?.qty || 0), 0);
-      return {
-        ...col,
-        totalAmount,
-        totalQty,
-        commentsCount: comments.length
-      };
-    })
-  );
-
-  return listWithTotals.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+  return db.getAll('columns');
 }
 
 export async function saveColumn(column) {
   const db = await initDB();
-  await db.put('columns', column);
-  return column;
+  return db.put('columns', column);
 }
 
 export async function deleteColumn(id) {
   const db = await initDB();
-  await db.delete('columns', id);
-  const tx = db.transaction(['images', 'comments'], 'readwrite');
-  const imageStore = tx.objectStore('images');
-  const commentStore = tx.objectStore('comments');
+  const tx = db.transaction(['columns', 'comments', 'images'], 'readwrite');
   
-  const images = await imageStore.index('columnId').getAll(id);
-  for (const img of images) await imageStore.delete(img.id);
+  await tx.objectStore('columns').delete(id);
   
-  const comments = await commentStore.index('columnId').getAll(id);
-  for (const cmt of comments) await commentStore.delete(cmt.id);
+  // 刪除關聯的留言與圖片
+  const cIndex = tx.objectStore('comments').index('columnId');
+  let cCursor = await cIndex.openCursor(id);
+  while (cCursor) {
+    await cCursor.delete();
+    cCursor = await cCursor.continue();
+  }
+
+  const iIndex = tx.objectStore('images').index('columnId');
+  let iCursor = await iIndex.openCursor(id);
+  while (iCursor) {
+    await iCursor.delete();
+    iCursor = await iCursor.continue();
+  }
 
   await tx.done;
 }
 
+// ---------------- 留言 (Comments) ----------------
 export async function getCommentsByColumn(columnId) {
   const db = await initDB();
-  const list = await db.getAllFromIndex('comments', 'columnId', columnId);
-  return list.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+  return db.getAllFromIndex('comments', 'columnId', columnId);
 }
 
 export async function saveComment(comment) {
   const db = await initDB();
-  await db.put('comments', comment);
-  return comment;
+  return db.put('comments', comment);
 }
 
 export async function deleteComment(id) {
   const db = await initDB();
-  await db.delete('comments', id);
+  return db.delete('comments', id);
 }
 
+// ---------------- 圖片 (Images) ----------------
 export async function getImagesByColumn(columnId) {
   const db = await initDB();
-  const list = await db.getAllFromIndex('images', 'columnId', columnId);
-  return list.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+  return db.getAllFromIndex('images', 'columnId', columnId);
 }
 
 export async function saveImage(image) {
   const db = await initDB();
-  await db.put('images', image);
-  return image;
+  return db.put('images', image);
 }
 
 export async function deleteImage(id) {
   const db = await initDB();
-  await db.delete('images', id);
+  return db.delete('images', id);
 }
 
-// ⭐ 批次一鍵刪除多張展圖 ⭐
-export async function deleteImagesBatch(ids) {
+// 批次刪除圖片
+export async function deleteImagesBatch(ids = []) {
+  if (!ids || ids.length === 0) return;
   const db = await initDB();
   const tx = db.transaction('images', 'readwrite');
-  const imageStore = tx.objectStore('images');
+  const store = tx.objectStore('images');
   for (const id of ids) {
-    await imageStore.delete(id);
+    await store.delete(id);
   }
   await tx.done;
 }
 
-// ⭐ 一鍵清空特定專欄下的所有展圖 ⭐
+// 刪除專欄下的所有圖片
 export async function deleteAllImagesByColumn(columnId) {
   const db = await initDB();
   const tx = db.transaction('images', 'readwrite');
-  const imageStore = tx.objectStore('images');
-  const images = await imageStore.index('columnId').getAll(columnId);
-  for (const img of images) {
-    await imageStore.delete(img.id);
+  const index = tx.objectStore('images').index('columnId');
+  let cursor = await index.openCursor(columnId);
+  while (cursor) {
+    await cursor.delete();
+    cursor = await cursor.continue();
   }
+  await tx.done;
+}
+
+// 重置所有資料
+export async function clearAllData() {
+  const db = await initDB();
+  const tx = db.transaction(['columns', 'comments', 'images', 'folders'], 'readwrite');
+  await tx.objectStore('columns').clear();
+  await tx.objectStore('comments').clear();
+  await tx.objectStore('images').clear();
+  await tx.objectStore('folders').clear();
   await tx.done;
 }

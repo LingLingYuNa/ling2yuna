@@ -1,13 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
-import { X, Sparkles, Image as ImageIcon, Upload, Link as LinkIcon } from 'lucide-react';
+import { X, Sparkles, Image as ImageIcon, Upload, Link as LinkIcon, Folder } from 'lucide-react';
 
 export default function ColumnModal() {
-  const { isColumnModalOpen, setIsColumnModalOpen, editingColumn, handleSaveColumn } = useApp();
+  const { isColumnModalOpen, setIsColumnModalOpen, editingColumn, handleSaveColumn, folders, selectedFolderId } = useApp();
 
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [category, setCategory] = useState('宣圖');
+  const [folderId, setFolderId] = useState('');
   const [coverImageMode, setCoverImageMode] = useState('upload');
   const [coverImage, setCoverImage] = useState('');
   const [tagsInput, setTagsInput] = useState('');
@@ -17,6 +18,7 @@ export default function ColumnModal() {
       setTitle(editingColumn.title || '');
       setDescription(editingColumn.description || '');
       setCategory(editingColumn.category || '宣圖');
+      setFolderId(editingColumn.folderId || '');
       setCoverImage(editingColumn.coverImage || '');
       setTagsInput((editingColumn.tags || []).join(', '));
       setCoverImageMode('upload');
@@ -24,11 +26,13 @@ export default function ColumnModal() {
       setTitle('');
       setDescription('');
       setCategory('宣圖');
+      // 若在特定的場次資料夾頁籤下點擊「建立專欄」，預設帶入該場次
+      setFolderId(selectedFolderId !== 'ALL' && selectedFolderId !== 'UNASSIGNED' ? selectedFolderId : '');
       setCoverImage('');
       setTagsInput('');
       setCoverImageMode('upload');
     }
-  }, [editingColumn, isColumnModalOpen]);
+  }, [editingColumn, isColumnModalOpen, selectedFolderId]);
 
   if (!isColumnModalOpen) return null;
 
@@ -54,11 +58,13 @@ export default function ColumnModal() {
 
     handleSaveColumn({
       id: editingColumn?.id,
+      folderId: folderId || null,
       title: title.trim(),
       description: description.trim(),
       category,
       coverImage: coverImage.trim(),
       tags,
+      isFavorite: editingColumn?.isFavorite,
       createdAt: editingColumn?.createdAt
     });
   };
@@ -82,8 +88,28 @@ export default function ColumnModal() {
           </button>
         </div>
 
-        {/* Form Body (2R 導角) */}
+        {/* Form Body */}
         <form onSubmit={handleSubmit} className="space-y-3.5 pt-3.5 overflow-y-auto pr-1">
+          {/* 所屬場次 / 資料夾 */}
+          <div>
+            <label className="block text-xs font-extrabold text-[#4c4993] mb-1 flex items-center gap-1">
+              <Folder className="w-3.5 h-3.5 text-[#4c4993]" />
+              <span>歸屬場次 / 資料夾</span>
+            </label>
+            <select
+              value={folderId}
+              onChange={(e) => setFolderId(e.target.value)}
+              className="w-full bg-white border border-[#bfc9eb] focus:border-[#4c4993] rounded-lg px-3 py-2 text-xs sm:text-sm text-[#161348] font-bold focus:outline-none"
+            >
+              <option value="">📂 未歸類 / 常規專欄</option>
+              {folders.map((f) => (
+                <option key={f.id} value={f.id}>
+                  📁 {f.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
           <div>
             <label className="block text-xs font-extrabold text-[#4c4993] mb-1">專欄名稱 *</label>
             <input
@@ -124,7 +150,7 @@ export default function ColumnModal() {
             </div>
           </div>
 
-          {/* 專欄封面圖片 (2R 導角) */}
+          {/* 專欄封面圖片 */}
           <div>
             <div className="flex items-center justify-between mb-1">
               <label className="block text-xs font-extrabold text-[#4c4993]">專欄封面圖片 (選填)</label>
@@ -168,7 +194,7 @@ export default function ColumnModal() {
                       <button
                         type="button"
                         onClick={(e) => { e.stopPropagation(); setCoverImage(''); }}
-                        className="text-xs text-red-600 hover:underline font-bold"
+                        className="text-[#e11d48] hover:underline text-xs font-bold"
                       >
                         移除封面
                       </button>

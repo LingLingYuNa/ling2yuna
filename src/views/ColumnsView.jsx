@@ -2,12 +2,28 @@ import React, { useState, useMemo, useLayoutEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import ColumnDetailView from './ColumnDetailView';
 import ExcelImportModal from '../components/ExcelImportModal';
+import FolderModal from '../components/FolderModal';
 import { generateAllColumnsTextReport, downloadTextFile, exportCommentsToExcel } from '../utils/exportUtils';
 import { getCommentsByColumn } from '../db/indexedDB';
-import { Plus, FolderHeart, ArrowRight, Sparkles, Image as ImageIcon, FileSpreadsheet, ArrowUpDown, Clock, RefreshCw, Heart, Search, X, MapPin, ChevronDown, ChevronUp, Maximize2, Download, FileText, Copy, Check } from 'lucide-react';
+import { Plus, FolderHeart, ArrowRight, Sparkles, Image as ImageIcon, FileSpreadsheet, ArrowUpDown, Clock, RefreshCw, Heart, Search, X, MapPin, ChevronDown, ChevronUp, Maximize2, Download, FileText, Copy, Check, Folder, FolderPlus, Edit3, Trash2, Tag } from 'lucide-react';
 
 export default function ColumnsView() {
-  const { columns, selectedColumnId, setSelectedColumnId, setIsColumnModalOpen, setEditingColumn, handleToggleFavorite, setLightboxImage } = useApp();
+  const {
+    columns,
+    folders,
+    selectedFolderId,
+    setSelectedFolderId,
+    selectedColumnId,
+    setSelectedColumnId,
+    setIsColumnModalOpen,
+    setEditingColumn,
+    setIsFolderModalOpen,
+    setEditingFolder,
+    handleDeleteFolder,
+    handleToggleFavorite,
+    setLightboxImage
+  } = useApp();
+
   const [isExcelModalOpen, setIsExcelModalOpen] = useState(false);
 
   // 攤位對照圖摺疊狀態 (預設展開供對照)
@@ -37,7 +53,7 @@ export default function ColumnsView() {
     }
   }, [selectedColumnId]);
 
-  // ⭐ 全站專欄名與留言導出處理函數 ⭐
+  // 全站專欄名與留言導出處理函數
   const fetchAllCommentsMap = async () => {
     const commentsMap = {};
     for (const col of columns) {
@@ -90,12 +106,25 @@ export default function ColumnsView() {
     }
   };
 
-  // 計算即時過濾 (搜尋關鍵字) 與動態排序後的專欄列表
-  const filteredAndSortedColumns = useMemo(() => {
+  // ⭐ 1. 依據 selectedFolderId 過濾屬於當前場次/資料夾的專欄 ⭐
+  const folderFilteredColumns = useMemo(() => {
     if (!columns || columns.length === 0) return [];
-    
+    if (selectedFolderId === 'ALL') return columns;
+    if (selectedFolderId === 'UNASSIGNED') {
+      return columns.filter(c => !c.folderId);
+    }
+    return columns.filter(c => c.folderId === selectedFolderId);
+  }, [columns, selectedFolderId]);
+
+  // ⭐ 2. 計算目前場次/資料夾的累積總花費 ⭐
+  const currentFolderTotalAmount = useMemo(() => {
+    return folderFilteredColumns.reduce((sum, c) => sum + (c.totalAmount || 0), 0);
+  }, [folderFilteredColumns]);
+
+  // ⭐ 3. 關鍵字搜尋過濾與排序 ⭐
+  const filteredAndSortedColumns = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
-    let result = columns.filter((col) => {
+    let result = folderFilteredColumns.filter((col) => {
       if (!query) return true;
       const matchTitle = (col.title || '').toLowerCase().includes(query);
       const matchDesc = (col.description || '').toLowerCase().includes(query);
@@ -131,9 +160,12 @@ export default function ColumnsView() {
       }
       return 0;
     });
-  }, [columns, searchQuery, sortBy]);
+  }, [folderFilteredColumns, searchQuery, sortBy]);
 
   const favoriteCount = useMemo(() => columns.filter(c => c.isFavorite).length, [columns]);
+
+  // 取得目前選取的場次資料夾物件
+  const activeFolder = folders.find(f => f.id === selectedFolderId);
 
   if (selectedColumnId) {
     return <ColumnDetailView />;
@@ -187,23 +219,122 @@ export default function ColumnsView() {
         )}
       </div>
 
+      {/* ⭐ 核心全新功能：同人展場次 / 資料夾頁籤列 (Folder Tabs Bar) ⭐ */}
+      <div className="bg-[#f4f5f1] border border-[#bfc9eb] rounded-lg p-2.5 shadow-xs space-y-2">
+        <div className="flex items-center justify-between px-1">
+          <div className="flex items-center space-x-1.5">
+            <Folder className="w-4 h-4 text-[#4c4993]" />
+            <span className="text-xs font-black text-[#4c4993]">場次 / 資料夾分類</span>
+          </div>
+
+          <button
+            onClick={() => {
+              setEditingFolder(null);
+              setIsFolderModalOpen(true);
+            }}
+            className="text-xs font-black text-[#161348] bg-[#a1cdc4] hover:bg-[#8ebfb5] px-2.5 py-1 rounded-md transition flex items-center gap-1 cursor-pointer shadow-xs"
+          >
+            <FolderPlus className="w-3.5 h-3.5 text-[#161348]" />
+            <span>新增場次資料夾</span>
+          </button>
+        </div>
+
+        {/* 橫向可滾動資料夾頁籤列表 */}
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 pt-0.5 scrollbar-none">
+          {/* 全部場次 */}
+          <button
+            onClick={() => setSelectedFolderId('ALL')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-black shrink-0 transition flex items-center gap-1.5 cursor-pointer border ${
+              selectedFolderId === 'ALL'
+                ? 'bg-[#4c4993] text-white border-[#4c4993] shadow-xs'
+                : 'bg-white text-[#4c4993] border-[#bfc9eb] hover:bg-[#e8ebf7]'
+            }`}
+          >
+            <span>📁 全部專欄</span>
+            <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-white/20 font-mono">
+              {columns.length}
+            </span>
+          </button>
+
+          {/* 各個展覽/同人場次資料夾 */}
+          {folders.map((f) => {
+            const count = columns.filter(c => c.folderId === f.id).length;
+            const isSelected = selectedFolderId === f.id;
+
+            return (
+              <div
+                key={f.id}
+                className={`group relative inline-flex items-center rounded-lg border transition shrink-0 ${
+                  isSelected
+                    ? 'bg-[#4c4993] text-white border-[#4c4993] shadow-xs'
+                    : 'bg-white text-[#4c4993] border-[#bfc9eb] hover:bg-[#e8ebf7]'
+                }`}
+              >
+                <button
+                  onClick={() => setSelectedFolderId(f.id)}
+                  className="px-3 py-1.5 text-xs font-black flex items-center gap-1.5 cursor-pointer"
+                >
+                  <span>📁 {f.name}</span>
+                  <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${isSelected ? 'bg-white/20' : 'bg-[#bfc9eb]/40'}`}>
+                    {count}
+                  </span>
+                </button>
+
+                {/* Hover 動作按鈕：編輯與刪除資料夾 */}
+                <div className="hidden group-hover:flex items-center space-x-1 pr-1.5 pl-0.5">
+                  <button
+                    onClick={() => {
+                      setEditingFolder(f);
+                      setIsFolderModalOpen(true);
+                    }}
+                    className="p-1 text-white/80 hover:text-white rounded hover:bg-white/20 transition cursor-pointer"
+                    title="編輯場次名稱"
+                  >
+                    <Edit3 className="w-3 h-3" />
+                  </button>
+                  <button
+                    onClick={() => handleDeleteFolder(f.id)}
+                    className="p-1 text-white/80 hover:text-red-300 rounded hover:bg-white/20 transition cursor-pointer"
+                    title="刪除資料夾 (專欄歸類回未分類)"
+                  >
+                    <Trash2 className="w-3 h-3" />
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
       {/* 標題與搜尋/動作區 */}
       <div className="bg-gradient-to-r from-[#f4f5f1] via-[#e8ebf7] to-[#d6dedf] p-4 sm:p-5 rounded-lg border border-[#bfc9eb] shadow-xs space-y-3.5">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
             <div className="flex items-center space-x-2 mb-1">
               <FolderHeart className="w-5 h-5 text-[#4c4993]" />
-              <h2 className="text-lg sm:text-xl font-black text-[#4c4993] tracking-tight">
-                二次元專欄展示牆
+              <h2 className="text-lg sm:text-xl font-black text-[#4c4993] tracking-tight flex items-center gap-2">
+                <span>{activeFolder ? `📁 ${activeFolder.name}` : '二次元專欄展示牆'}</span>
               </h2>
             </div>
             <p className="text-[#4c4993] text-xs font-semibold">
-              建立專屬的主題專欄藝廊，上傳宣圖與擺設照，搭配「留言即記帳」自動精算總花費
+              {activeFolder
+                ? activeFolder.description || `包含 ${folderFilteredColumns.length} 個專欄紀錄`
+                : '建立專屬的主題專欄藝廊，上傳宣圖與擺設照，搭配「留言即記帳」自動精算總花費'}
             </p>
           </div>
 
           <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
-            {/* ⭐ 全站匯出專欄與留言選單 ⭐ */}
+            {/* 目前場次總金額統計 */}
+            <div className="bg-white border border-[#4c4993]/30 px-3 py-1 rounded-lg text-right shadow-xs">
+              <span className="text-[10px] font-black text-[#4c4993] block">
+                {activeFolder ? `${activeFolder.name} 累積金額` : '專欄牆總累計'}
+              </span>
+              <span className="text-xs font-black font-mono text-[#161348]">
+                NT$ {currentFolderTotalAmount.toLocaleString()}
+              </span>
+            </div>
+
+            {/* 全站導出專欄與留言選單 */}
             <div className="relative">
               <button
                 onClick={() => setIsExportMenuOpen(!isExportMenuOpen)}
@@ -327,10 +458,10 @@ export default function ColumnsView() {
             <Sparkles className="w-6 h-6 text-[#4c4993]" />
           </div>
           <h3 className="text-base font-black text-[#4c4993] mb-1.5">
-            {searchQuery ? '找不到相符的專欄' : '專欄牆目前尚無資料'}
+            {searchQuery ? '找不到相符的專欄' : '此場次 / 資料夾內尚無專欄'}
           </h3>
           <p className="text-xs text-[#4c4993] font-bold max-w-md mx-auto mb-5">
-            {searchQuery ? '請嘗試更換搜尋關鍵字或點擊右上角清除搜尋' : '點擊「建立第一個專欄」或「Excel 匯入」開始新增您的第一個主題展示牆！'}
+            {searchQuery ? '請嘗試更換搜尋關鍵字或點擊右上角清除搜尋' : '點擊「建立第一個專欄」開始在此場次新增您的主題展示牆！'}
           </p>
           {!searchQuery && (
             <div className="flex items-center justify-center gap-2">
@@ -356,99 +487,115 @@ export default function ColumnsView() {
         </div>
       ) : (
         <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-5 items-start">
-          {filteredAndSortedColumns.map((col) => (
-            <div
-              key={col.id}
-              onClick={() => setSelectedColumnId(col.id)}
-              className="group glass-card rounded-lg overflow-hidden cursor-pointer transition-all duration-200 hover:-translate-y-0.5 flex flex-col justify-between h-full relative"
-            >
-              <div>
-                {/* 封面圖 (含「我的最愛」愛心按鈕) */}
-                <div className="w-full relative overflow-hidden bg-[#e8ebf7] min-h-[110px] flex items-center justify-center">
-                  {col.coverImage ? (
-                    <img
-                      src={col.coverImage}
-                      alt={col.title}
-                      className="w-full h-auto object-contain max-h-[360px] group-hover:scale-102 transition duration-300"
-                    />
-                  ) : (
-                    <div className="text-center p-4">
-                      <ImageIcon className="w-7 h-7 text-[#4c4993]/40 mx-auto mb-1" />
-                      <span className="text-[10px] text-[#4c4993] font-black">專欄展示圖</span>
-                    </div>
-                  )}
+          {filteredAndSortedColumns.map((col) => {
+            const folderObj = folders.find(f => f.id === col.folderId);
 
-                  {/* 頂部左側：分類標籤 */}
-                  <div className="absolute top-2 left-2">
-                    <span className="text-[10px] font-black px-2 py-0.5 rounded bg-[#4c4993] text-white shadow-xs border border-white/40">
-                      {col.category}
-                    </span>
-                  </div>
-
-                  {/* 頂部右側：我的最愛愛心按鈕 */}
-                  <button
-                    type="button"
-                    onClick={(e) => handleToggleFavorite(col.id, e)}
-                    className="absolute top-2 right-2 p-1.5 rounded-full bg-black/40 hover:bg-black/60 transition cursor-pointer backdrop-blur-xs border border-white/40 shadow-md group/heart"
-                    title={col.isFavorite ? '取消收藏我的最愛' : '加入我的最愛'}
-                  >
-                    <Heart
-                      className={`w-3.5 h-3.5 transition-transform group-hover/heart:scale-110 ${
-                        col.isFavorite
-                          ? 'fill-[#e11d48] text-[#e11d48]'
-                          : 'text-white/90 hover:text-white'
-                      }`}
-                    />
-                  </button>
-
-                  {/* 封面圖下方花費膠囊 */}
-                  <div className="absolute bottom-2 right-2">
-                    <span className="text-[10px] font-black px-2 py-0.5 rounded bg-[#a1cdc4] text-[#161348] shadow-xs border border-white/60 font-mono flex items-center gap-1">
-                      NT$ {(col.totalAmount || 0).toLocaleString()}
-                    </span>
-                  </div>
-                </div>
-
-                {/* 專欄內文 */}
-                <div className="p-3 sm:p-4">
-                  <h3 className="font-black text-sm sm:text-base text-[#4c4993] group-hover:text-[#2b2773] transition mb-1 line-clamp-1 flex items-center gap-1">
-                    {col.isFavorite && (
-                      <Heart className="w-3.5 h-3.5 fill-[#e11d48] text-[#e11d48] shrink-0" />
+            return (
+              <div
+                key={col.id}
+                onClick={() => setSelectedColumnId(col.id)}
+                className="group glass-card rounded-lg overflow-hidden cursor-pointer transition-all duration-200 hover:-translate-y-0.5 flex flex-col justify-between h-full relative"
+              >
+                <div>
+                  {/* 封面圖 */}
+                  <div className="w-full relative overflow-hidden bg-[#e8ebf7] min-h-[110px] flex items-center justify-center">
+                    {col.coverImage ? (
+                      <img
+                        src={col.coverImage}
+                        alt={col.title}
+                        className="w-full h-auto object-contain max-h-[360px] group-hover:scale-102 transition duration-300"
+                      />
+                    ) : (
+                      <div className="text-center p-4">
+                        <ImageIcon className="w-7 h-7 text-[#4c4993]/40 mx-auto mb-1" />
+                        <span className="text-[10px] text-[#4c4993] font-black">專欄展示圖</span>
+                      </div>
                     )}
-                    <span>{col.title}</span>
-                  </h3>
-                  <p className="text-[#4c4993]/90 text-[10px] sm:text-xs line-clamp-2 leading-relaxed mb-2 font-semibold">
-                    {col.description || '無簡介說明'}
-                  </p>
 
-                  {/* 標籤 */}
-                  {col.tags && col.tags.length > 0 && (
-                    <div className="flex flex-wrap gap-1 mb-1">
-                      {col.tags.map((t, idx) => (
-                        <span key={idx} className="text-[9px] text-[#161348] bg-[#a1cdc4]/40 px-1.5 py-0.5 rounded border border-[#a1cdc4] font-extrabold">
-                          #{t}
+                    {/* 頂部左側：分類標籤 */}
+                    <div className="absolute top-2 left-2 flex flex-col gap-1 items-start">
+                      <span className="text-[10px] font-black px-2 py-0.5 rounded bg-[#4c4993] text-white shadow-xs border border-white/40">
+                        {col.category}
+                      </span>
+                      {folderObj && (
+                        <span className="text-[9px] font-extrabold px-1.5 py-0.2 rounded bg-[#161348]/85 text-[#a1cdc4] border border-white/30 backdrop-blur-xs">
+                          📁 {folderObj.name}
                         </span>
-                      ))}
+                      )}
                     </div>
-                  )}
-                </div>
-              </div>
 
-              {/* 底部指引 */}
-              <div className="px-3 py-2 border-t border-[#bfc9eb]/60 bg-[#f4f5f1] flex items-center justify-between text-[10px] sm:text-xs text-[#4c4993] mt-auto">
-                <div className="flex items-center gap-1 text-[#4c4993]/80 font-mono font-bold" title="內容最後更新時間">
-                  <RefreshCw className="w-3 h-3 text-[#4c4993]" />
-                  <span>{new Date(col.updatedAt || col.createdAt || Date.now()).toLocaleDateString()}</span>
+                    {/* 頂部右側：我的最愛愛心按鈕 */}
+                    <button
+                      type="button"
+                      onClick={(e) => handleToggleFavorite(col.id, e)}
+                      className="absolute top-2 right-2 p-1.5 rounded-full bg-black/40 hover:bg-black/60 transition cursor-pointer backdrop-blur-xs border border-white/40 shadow-md group/heart"
+                      title={col.isFavorite ? '取消收藏我的最愛' : '加入我的最愛'}
+                    >
+                      <Heart
+                        className={`w-3.5 h-3.5 transition-transform group-hover/heart:scale-110 ${
+                          col.isFavorite
+                            ? 'fill-[#e11d48] text-[#e11d48]'
+                            : 'text-white/90 hover:text-white'
+                        }`}
+                      />
+                    </button>
+
+                    {/* 封面圖下方花費膠囊 */}
+                    <div className="absolute bottom-2 right-2">
+                      <span className="text-[10px] font-black px-2 py-0.5 rounded bg-[#a1cdc4] text-[#161348] shadow-xs border border-white/60 font-mono flex items-center gap-1">
+                        NT$ {(col.totalAmount || 0).toLocaleString()}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* 專欄內文 */}
+                  <div className="p-3 sm:p-4">
+                    <h3 className="font-black text-sm sm:text-base text-[#4c4993] group-hover:text-[#2b2773] transition mb-1 line-clamp-1 flex items-center gap-1">
+                      {col.isFavorite && (
+                        <Heart className="w-3.5 h-3.5 fill-[#e11d48] text-[#e11d48] shrink-0" />
+                      )}
+                      <span>{col.title}</span>
+                    </h3>
+                    <p className="text-[#4c4993]/90 text-[10px] sm:text-xs line-clamp-2 leading-relaxed mb-2 font-semibold">
+                      {col.description || '無簡介說明'}
+                    </p>
+
+                    {/* 標籤 */}
+                    {col.tags && col.tags.length > 0 && (
+                      <div className="flex flex-wrap gap-1 mb-1">
+                        {col.tags.map((t, idx) => (
+                          <span key={idx} className="text-[9px] text-[#161348] bg-[#a1cdc4]/40 px-1.5 py-0.5 rounded border border-[#a1cdc4] font-extrabold">
+                            #{t}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </div>
-                <ArrowRight className="w-3.5 h-3.5 text-[#4c4993] group-hover:translate-x-1 transition shrink-0" />
+
+                {/* 底部指引 */}
+                <div className="px-3 py-2 border-t border-[#bfc9eb]/60 bg-[#f4f5f1] flex items-center justify-between text-[10px] sm:text-xs text-[#4c4993] mt-auto">
+                  <div className="flex items-center gap-1 text-[#4c4993]/80 font-mono font-bold" title="內容最後更新時間">
+                    <RefreshCw className="w-3 h-3 text-[#4c4993]" />
+                    <span>{new Date(col.updatedAt || col.createdAt || Date.now()).toLocaleDateString()}</span>
+                  </div>
+                  <ArrowRight className="w-3.5 h-3.5 text-[#4c4993] group-hover:translate-x-1 transition shrink-0" />
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
       {/* Excel 匯入 Modal */}
       <ExcelImportModal isOpen={isExcelModalOpen} onClose={() => setIsExcelModalOpen(false)} />
+
+      {/* 📁 場次資料夾 Modal */}
+      <FolderModal
+        isOpen={useApp().isFolderModalOpen}
+        onClose={() => useApp().setIsFolderModalOpen(false)}
+        editingFolder={useApp().editingFolder}
+      />
     </div>
   );
 }
