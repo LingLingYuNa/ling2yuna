@@ -5,12 +5,14 @@ import {
   requestGoogleAccessToken,
   logoutGoogle,
   uploadToGoogleDrive,
-  downloadFromGoogleDrive
+  downloadFromGoogleDrive,
+  getSavedClientId,
+  saveClientId
 } from '../utils/googleDriveSync';
-import { X, Cloud, Download, Upload, RefreshCw, Check, AlertCircle, FileJson, Copy, ShieldCheck, LogOut, Lock } from 'lucide-react';
+import { X, Cloud, Download, Upload, RefreshCw, Check, AlertCircle, FileJson, Copy, ShieldCheck, LogOut, Settings, ExternalLink, Key } from 'lucide-react';
 
 export default function SyncModal({ isOpen, onClose }) {
-  const { exportFullBackupJSON, importFullBackupJSON, columns, folders } = useApp();
+  const { exportFullBackupJSON, importFullBackupJSON } = useApp();
 
   // Google Drive 同步狀態
   const [googleUser, setGoogleUser] = useState(null);
@@ -19,21 +21,54 @@ export default function SyncModal({ isOpen, onClose }) {
   const [syncStatusMsg, setSyncStatusMsg] = useState(null); // { type: 'success'|'error', text: '' }
   const [lastSyncTime, setLastSyncTime] = useState('');
 
-  // 手動 JSON 本地備份狀態
-  const [copiedJSON, setCopiedJSON] = useState(false);
+  // Client ID 設定狀態
+  const [clientIdInput, setClientIdInput] = useState('');
+  const [showConfigPanel, setShowConfigPanel] = useState(false);
+  const [copiedOrigin, setCopiedOrigin] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
       setGoogleUser(getSavedGoogleUser());
       setLastSyncTime(localStorage.getItem('collecttrack_gdrive_last_sync') || '');
       setSyncStatusMsg(null);
+      const savedId = getSavedClientId();
+      setClientIdInput(savedId);
+      if (!savedId) {
+        setShowConfigPanel(true);
+      }
     }
   }, [isOpen]);
 
   if (!isOpen) return null;
 
+  // 儲存設定 Client ID
+  const handleSaveClientId = () => {
+    if (!clientIdInput.trim()) {
+      alert('請輸入有效的 Google OAuth Client ID');
+      return;
+    }
+    saveClientId(clientIdInput.trim());
+    setSyncStatusMsg({ type: 'success', text: '✅ Client ID 已成功儲存！現在可以點擊授權登入囉。' });
+    setShowConfigPanel(false);
+  };
+
+  // 複製目前的 Vercel 網址供設定 JavaScript origins 使用
+  const handleCopyOrigin = () => {
+    const origin = window.location.origin;
+    navigator.clipboard.writeText(origin);
+    setCopiedOrigin(true);
+    setTimeout(() => setCopiedOrigin(false), 2000);
+  };
+
   // 登入 Google 帳號授權 appDataFolder
   const handleGoogleLogin = async () => {
+    const currentId = getSavedClientId();
+    if (!currentId) {
+      setShowConfigPanel(true);
+      setSyncStatusMsg({ type: 'error', text: '請先在下方填入您的 Google OAuth Client ID 即可開始使用！' });
+      return;
+    }
+
     setIsAuthorizing(true);
     setSyncStatusMsg(null);
     try {
@@ -42,7 +77,12 @@ export default function SyncModal({ isOpen, onClose }) {
       setSyncStatusMsg({ type: 'success', text: `成功連結 Google 帳號 (${user.email || user.name})！` });
     } catch (err) {
       console.error('Google login failed:', err);
-      setSyncStatusMsg({ type: 'error', text: 'Google 登入授權失敗，請再試一次。' });
+      if (err.message === 'MISSING_CLIENT_ID') {
+        setShowConfigPanel(true);
+        setSyncStatusMsg({ type: 'error', text: '請先設定 Client ID 才能連接 Google 雲端。' });
+      } else {
+        setSyncStatusMsg({ type: 'error', text: 'Google 授權失敗 (請確認已將目前的網址加到 Google Console 的已核准來源)。' });
+      }
     } finally {
       setIsAuthorizing(false);
     }
@@ -67,7 +107,7 @@ export default function SyncModal({ isOpen, onClose }) {
     } catch (err) {
       console.error('Upload error:', err);
       if (err.message && err.message.includes('過期')) {
-        setSyncStatusMsg({ type: 'error', text: 'Google 登入憑證已過期，請重新登入連結！' });
+        setSyncStatusMsg({ type: 'error', text: 'Google 登入憑證已過期，請重新點擊登入！' });
       } else {
         setSyncStatusMsg({ type: 'error', text: `雲端上傳失敗: ${err.message || '請重新登入 Google 帳號'}` });
       }
@@ -92,7 +132,7 @@ export default function SyncModal({ isOpen, onClose }) {
     } catch (err) {
       console.error('Download error:', err);
       if (err.message && err.message.includes('過期')) {
-        setSyncStatusMsg({ type: 'error', text: 'Google 登入憑證已過期，請重新登入連結！' });
+        setSyncStatusMsg({ type: 'error', text: 'Google 登入憑證已過期，請重新點擊登入！' });
       } else {
         setSyncStatusMsg({ type: 'error', text: `雲端還原失敗: ${err.message || '找不到雲端備份檔'}` });
       }
@@ -183,17 +223,29 @@ export default function SyncModal({ isOpen, onClose }) {
                 </div>
               </div>
 
-              {googleUser && (
+              <div className="flex items-center space-x-1.5">
                 <button
                   type="button"
-                  onClick={handleGoogleLogout}
-                  className="text-[11px] text-white/70 hover:text-white flex items-center gap-1 bg-white/10 hover:bg-white/20 px-2 py-1 rounded transition cursor-pointer"
-                  title="登出 Google 帳號"
+                  onClick={() => setShowConfigPanel(!showConfigPanel)}
+                  className="text-[11px] text-white/80 hover:text-white flex items-center gap-1 bg-white/10 hover:bg-white/20 px-2 py-1 rounded transition cursor-pointer border border-white/20"
+                  title="設定 Google API Client ID"
                 >
-                  <LogOut className="w-3 h-3" />
-                  <span>登出</span>
+                  <Settings className="w-3.5 h-3.5" />
+                  <span>{showConfigPanel ? '收合設定' : '設定 Client ID'}</span>
                 </button>
-              )}
+
+                {googleUser && (
+                  <button
+                    type="button"
+                    onClick={handleGoogleLogout}
+                    className="text-[11px] text-white/70 hover:text-white flex items-center gap-1 bg-white/10 hover:bg-white/20 px-2 py-1 rounded transition cursor-pointer"
+                    title="登出 Google 帳號"
+                  >
+                    <LogOut className="w-3 h-3" />
+                    <span>登出</span>
+                  </button>
+                )}
+              </div>
             </div>
 
             {/* 提示訊息 Toast */}
@@ -205,6 +257,60 @@ export default function SyncModal({ isOpen, onClose }) {
               }`}>
                 {syncStatusMsg.type === 'success' ? <Check className="w-4 h-4 shrink-0" /> : <AlertCircle className="w-4 h-4 shrink-0" />}
                 <span>{syncStatusMsg.text}</span>
+              </div>
+            )}
+
+            {/* ⚙️ Client ID 設定面板 (1 分鐘免費引導) */}
+            {showConfigPanel && (
+              <div className="bg-white/15 backdrop-blur-md p-3.5 rounded-lg border border-white/30 space-y-3 animate-fade-in text-xs">
+                <div className="flex items-center justify-between">
+                  <span className="font-black text-white flex items-center gap-1">
+                    <Key className="w-3.5 h-3.5 text-[#a1cdc4]" />
+                    設定您的 Google OAuth Client ID
+                  </span>
+                  <a
+                    href="https://console.cloud.google.com/apis/credentials"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-[10px] text-[#a1cdc4] hover:underline flex items-center gap-0.5 font-bold"
+                  >
+                    前往 Google Console <ExternalLink className="w-3 h-3" />
+                  </a>
+                </div>
+
+                <div className="space-y-1.5 text-[11px] text-white/90">
+                  <div className="flex items-center justify-between bg-black/20 p-2 rounded border border-white/10 font-bold">
+                    <span>1. 複製此網址填入「已核准 JavaScript 來源」:</span>
+                    <button
+                      type="button"
+                      onClick={handleCopyOrigin}
+                      className="bg-white/20 hover:bg-white/30 px-2 py-0.5 rounded text-[10px] font-black text-[#a1cdc4] flex items-center gap-1 cursor-pointer"
+                    >
+                      {copiedOrigin ? <Check className="w-3 h-3 text-green-300" /> : <Copy className="w-3 h-3" />}
+                      <span>{copiedOrigin ? '已複製網址' : '複製網址'}</span>
+                    </button>
+                  </div>
+                  <p className="text-[10px] text-[#a1cdc4] font-semibold">
+                    2. 在 Google Console 建立「Web 應用程式 ID」，並將產生的 Client ID 貼在下方：
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    value={clientIdInput}
+                    onChange={(e) => setClientIdInput(e.target.value)}
+                    placeholder="貼上格式如: xxxx.apps.googleusercontent.com"
+                    className="flex-1 bg-white text-[#161348] border border-white/40 focus:border-[#a1cdc4] rounded px-2.5 py-1.5 text-xs font-bold focus:outline-none"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleSaveClientId}
+                    className="bg-[#a1cdc4] hover:bg-[#8ebfb5] text-[#161348] font-black text-xs px-3 py-1.5 rounded transition cursor-pointer shrink-0 shadow-xs"
+                  >
+                    儲存 Key
+                  </button>
+                </div>
               </div>
             )}
 

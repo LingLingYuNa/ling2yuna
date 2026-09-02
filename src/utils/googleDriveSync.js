@@ -3,11 +3,21 @@
 const SCOPES = 'https://www.googleapis.com/auth/drive.appdata https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/userinfo.email';
 const BACKUP_FILENAME = 'collecttrack_backup.json';
 
-// 預設開箱即用 Client ID (若在特殊環境可自訂)
-const DEFAULT_CLIENT_ID = '985420349887-8h7k5m74b7k2311l3n9u4c12345.apps.googleusercontent.com';
-
 let tokenClient = null;
 let accessToken = null;
+
+// 取得或設定自訂的 Client ID
+export function getSavedClientId() {
+  return localStorage.getItem('collecttrack_gdrive_client_id') || '';
+}
+
+export function saveClientId(clientId) {
+  if (clientId && clientId.trim()) {
+    localStorage.setItem('collecttrack_gdrive_client_id', clientId.trim());
+  } else {
+    localStorage.removeItem('collecttrack_gdrive_client_id');
+  }
+}
 
 // 動態載入 Google Identity Services SDK
 export function loadGsiScript() {
@@ -46,14 +56,18 @@ export function saveGoogleUser(userObj) {
 }
 
 // 初始化 Token Client 並獲取授權
-export async function requestGoogleAccessToken(customClientId = '') {
+export async function requestGoogleAccessToken(overrideClientId = '') {
   await loadGsiScript();
-  const clientId = customClientId || DEFAULT_CLIENT_ID;
+  const clientId = overrideClientId || getSavedClientId();
+
+  if (!clientId || !clientId.trim()) {
+    throw new Error('MISSING_CLIENT_ID');
+  }
 
   return new Promise((resolve, reject) => {
     try {
       tokenClient = window.google.accounts.oauth2.initTokenClient({
-        client_id: clientId,
+        client_id: clientId.trim(),
         scope: SCOPES,
         callback: async (response) => {
           if (response.error) {
