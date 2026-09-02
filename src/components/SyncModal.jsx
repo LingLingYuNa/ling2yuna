@@ -9,7 +9,7 @@ import {
   getSavedClientId,
   saveClientId
 } from '../utils/googleDriveSync';
-import { X, Cloud, Download, Upload, RefreshCw, Check, AlertCircle, FileJson, Copy, ShieldCheck, LogOut, Settings, ExternalLink, Key } from 'lucide-react';
+import { X, Cloud, Download, Upload, RefreshCw, Check, AlertCircle, FileJson, Copy, ShieldCheck, LogOut, Settings, ExternalLink, Key, HelpCircle } from 'lucide-react';
 
 export default function SyncModal({ isOpen, onClose }) {
   const { exportFullBackupJSON, importFullBackupJSON } = useApp();
@@ -81,7 +81,7 @@ export default function SyncModal({ isOpen, onClose }) {
         setShowConfigPanel(true);
         setSyncStatusMsg({ type: 'error', text: '請先設定 Client ID 才能連接 Google 雲端。' });
       } else {
-        setSyncStatusMsg({ type: 'error', text: 'Google 授權失敗 (請確認已將目前的網址加到 Google Console 的已核准來源)。' });
+        setSyncStatusMsg({ type: 'error', text: '提示：若出現 403 access_denied 錯誤，請至 Google Console 點擊「發布應用程式」或把您的 Gmail 加為測試人員即可！' });
       }
     } finally {
       setIsAuthorizing(false);
@@ -290,9 +290,16 @@ export default function SyncModal({ isOpen, onClose }) {
                       <span>{copiedOrigin ? '已複製網址' : '複製網址'}</span>
                     </button>
                   </div>
-                  <p className="text-[10px] text-[#a1cdc4] font-semibold">
-                    2. 在 Google Console 建立「Web 應用程式 ID」，並將產生的 Client ID 貼在下方：
-                  </p>
+                  
+                  <div className="bg-amber-500/20 p-2 rounded border border-amber-300/30 text-[10px] text-amber-200 font-bold space-y-1">
+                    <div className="flex items-center gap-1 text-white">
+                      <HelpCircle className="w-3.5 h-3.5 text-amber-300 shrink-0" />
+                      <span>出現 403 access_denied 解決方法：</span>
+                    </div>
+                    <p>
+                      前往 Google Console 的「OAuth 同意畫面」，點擊 <strong className="text-white">【發布應用程式 (Publish App)】</strong>，或者在「測試使用者」加入您的 Gmail 帳號即可！
+                    </p>
+                  </div>
                 </div>
 
                 <div className="flex items-center gap-2">
