@@ -5,7 +5,7 @@ import ExcelImportModal from '../components/ExcelImportModal';
 import FolderModal from '../components/FolderModal';
 import { generateAllColumnsTextReport, downloadTextFile, exportCommentsToExcel } from '../utils/exportUtils';
 import { getCommentsByColumn } from '../db/indexedDB';
-import { Plus, FolderHeart, ArrowRight, Sparkles, Image as ImageIcon, FileSpreadsheet, ArrowUpDown, Clock, RefreshCw, Heart, Search, X, MapPin, ChevronDown, ChevronUp, Maximize2, Download, FileText, Copy, Check, Folder, FolderPlus, Edit3, Trash2, Tag } from 'lucide-react';
+import { Plus, FolderHeart, ArrowRight, Sparkles, Image as ImageIcon, FileSpreadsheet, ArrowUpDown, Clock, RefreshCw, Heart, Search, X, MapPin, ChevronDown, ChevronUp, Maximize2, Download, FileText, Copy, Check, Folder, FolderPlus, Edit3, Trash2, Tag, ArrowRightLeft, Settings } from 'lucide-react';
 
 export default function ColumnsView() {
   const {
@@ -106,7 +106,7 @@ export default function ColumnsView() {
     }
   };
 
-  // ⭐ 1. 依據 selectedFolderId 過濾屬於當前場次/資料夾的專欄 ⭐
+  // 1. 依據 selectedFolderId 過濾屬於當前場次/資料夾的專欄
   const folderFilteredColumns = useMemo(() => {
     if (!columns || columns.length === 0) return [];
     if (selectedFolderId === 'ALL') return columns;
@@ -116,12 +116,12 @@ export default function ColumnsView() {
     return columns.filter(c => c.folderId === selectedFolderId);
   }, [columns, selectedFolderId]);
 
-  // ⭐ 2. 計算目前場次/資料夾的累積總花費 ⭐
+  // 2. 計算目前場次/資料夾的累積總花費
   const currentFolderTotalAmount = useMemo(() => {
     return folderFilteredColumns.reduce((sum, c) => sum + (c.totalAmount || 0), 0);
   }, [folderFilteredColumns]);
 
-  // ⭐ 3. 關鍵字搜尋過濾與排序 ⭐
+  // 3. 關鍵字搜尋過濾與排序
   const filteredAndSortedColumns = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
     let result = folderFilteredColumns.filter((col) => {
@@ -195,7 +195,7 @@ export default function ColumnsView() {
 
         {showBoothMap && (
           <div className="p-3 sm:p-4 bg-[#f4f5f1] border-t border-[#4c4993]/20 flex flex-col items-center justify-center animate-fade-in">
-            <div className="relative group max-w-xl w-full rounded-lg overflow-hidden border border-[#bfc9eb] bg-white shadow-xs">
+            <div className="relative group max-w-xl w-full rounded-lg overflow-hidden border border-[#bfc9eb] bg-[#f4f5f1] shadow-xs">
               <img
                 src="/booth_map.jpg"
                 alt="展場攤位對照圖 (C, D, E 區)"
@@ -219,7 +219,7 @@ export default function ColumnsView() {
         )}
       </div>
 
-      {/* ⭐ 核心全新功能：同人展場次 / 資料夾頁籤列 (Folder Tabs Bar) ⭐ */}
+      {/* 核心同人展場次 / 資料夾頁籤列 (Folder Tabs Bar) */}
       <div className="bg-[#f4f5f1] border border-[#bfc9eb] rounded-lg p-2.5 shadow-xs space-y-2">
         <div className="flex items-center justify-between px-1">
           <div className="flex items-center space-x-1.5">
@@ -288,7 +288,7 @@ export default function ColumnsView() {
                       setIsFolderModalOpen(true);
                     }}
                     className="p-1 text-white/80 hover:text-white rounded hover:bg-white/20 transition cursor-pointer"
-                    title="編輯場次名稱"
+                    title="編輯資料夾內容與批量歸納轉移"
                   >
                     <Edit3 className="w-3 h-3" />
                   </button>
@@ -314,6 +314,21 @@ export default function ColumnsView() {
               <FolderHeart className="w-5 h-5 text-[#4c4993]" />
               <h2 className="text-lg sm:text-xl font-black text-[#4c4993] tracking-tight flex items-center gap-2">
                 <span>{activeFolder ? `📁 ${activeFolder.name}` : '二次元專欄展示牆'}</span>
+                
+                {/* ⭐ 當選中特定資料夾時，提供一鍵管理與歸納轉移按鈕 ⭐ */}
+                {activeFolder && (
+                  <button
+                    onClick={() => {
+                      setEditingFolder(activeFolder);
+                      setIsFolderModalOpen(true);
+                    }}
+                    className="text-xs font-black text-[#161348] bg-[#a1cdc4] hover:bg-[#8ebfb5] px-2.5 py-1 rounded-md transition flex items-center gap-1 cursor-pointer shadow-xs border border-[#a1cdc4]"
+                    title="一鍵編輯資料夾名稱與批量將專欄歸納至其他資料夾"
+                  >
+                    <ArrowRightLeft className="w-3.5 h-3.5 text-[#161348]" />
+                    <span>一鍵管理 / 批量歸納</span>
+                  </button>
+                )}
               </h2>
             </div>
             <p className="text-[#4c4993] text-xs font-semibold">
@@ -590,7 +605,7 @@ export default function ColumnsView() {
       {/* Excel 匯入 Modal */}
       <ExcelImportModal isOpen={isExcelModalOpen} onClose={() => setIsExcelModalOpen(false)} />
 
-      {/* 📁 場次資料夾 Modal */}
+      {/* 場次資料夾 Modal */}
       <FolderModal
         isOpen={useApp().isFolderModalOpen}
         onClose={() => useApp().setIsFolderModalOpen(false)}

@@ -155,6 +155,28 @@ export function AppProvider({ children }) {
     await refreshColumns();
   };
 
+  // ⭐ 📁 一鍵將 A 資料夾裡的所有專欄批量轉移至 B 資料夾 ⭐
+  const handleMoveAllColumnsBetweenFolders = async (sourceFolderId, targetFolderId) => {
+    if (!sourceFolderId) return;
+    const destId = (targetFolderId === 'NONE' || !targetFolderId) ? null : targetFolderId;
+    
+    const affected = columns.filter(c => c.folderId === sourceFolderId);
+    if (affected.length === 0) {
+      alert('目前此資料夾內沒有專欄可進行轉移');
+      return;
+    }
+
+    for (const col of affected) {
+      await saveColumn({
+        ...col,
+        folderId: destId,
+        updatedAt: new Date().toISOString()
+      });
+    }
+
+    await refreshColumns();
+  };
+
   // 觸發指定專欄的 updatedAt 時間戳記更新
   const touchColumnUpdatedAt = async (colId) => {
     const target = columns.find(c => c.id === colId);
@@ -413,6 +435,7 @@ export function AppProvider({ children }) {
         // Actions
         handleSaveFolder,
         handleDeleteFolder,
+        handleMoveAllColumnsBetweenFolders,
         handleSaveColumn,
         handleDeleteColumn,
         handleResetData,
