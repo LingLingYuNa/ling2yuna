@@ -3,7 +3,7 @@ import { useApp } from '../context/AppContext';
 import { X, FolderPlus, FolderCheck, ArrowRightLeft, Folder, Check, AlertCircle } from 'lucide-react';
 
 export default function FolderModal({ isOpen, onClose, editingFolder = null }) {
-  const { folders, columns, handleSaveFolder, handleMoveAllColumnsBetweenFolders, handleSaveColumn } = useApp();
+  const { folders, columns, handleSaveFolder, handleMoveAllColumnsBetweenFolders, handleSaveColumn, setEditingFolder } = useApp();
 
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
@@ -31,6 +31,12 @@ export default function FolderModal({ isOpen, onClose, editingFolder = null }) {
 
   if (!isOpen) return null;
 
+  // 統一的安全關閉彈窗函數
+  const handleModalClose = () => {
+    if (setEditingFolder) setEditingFolder(null);
+    onClose();
+  };
+
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!name.trim()) return;
@@ -42,7 +48,7 @@ export default function FolderModal({ isOpen, onClose, editingFolder = null }) {
       createdAt: editingFolder?.createdAt
     });
 
-    onClose();
+    handleModalClose();
   };
 
   // 處理批量轉移所有專欄至另一個資料夾
@@ -66,7 +72,7 @@ export default function FolderModal({ isOpen, onClose, editingFolder = null }) {
     setTimeout(() => setTransferSuccess(false), 3000);
   };
 
-  // ⭐ 將單個專欄精準移出場次資料夾 ⭐
+  // 將單個專欄精準移出場次資料夾
   const handleRemoveSingleColumnFromFolder = async (columnObj) => {
     await handleSaveColumn({
       id: columnObj.id,
@@ -77,30 +83,38 @@ export default function FolderModal({ isOpen, onClose, editingFolder = null }) {
       tags: columnObj.tags,
       isFavorite: columnObj.isFavorite,
       createdAt: columnObj.createdAt,
-      folderId: null // 顯式賦予 null 解除場次歸類
+      folderId: null
     });
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#4c4993]/50 backdrop-blur-sm animate-fade-in">
-      <div className="w-full max-w-md bg-[#f4f5f1] border border-[#bfc9eb] rounded-lg shadow-xl p-5 overflow-hidden animate-slide-up max-h-[90vh] flex flex-col">
+    <div
+      onClick={handleModalClose}
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#4c4993]/50 backdrop-blur-sm animate-fade-in"
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="w-full max-w-md bg-[#f4f5f1] border border-[#bfc9eb] rounded-lg shadow-xl p-5 overflow-hidden animate-slide-up max-h-[90vh] flex flex-col relative"
+      >
         {/* Header */}
         <div className="flex items-center justify-between pb-3 border-b border-[#bfc9eb]/50">
-          <div className="flex items-center space-x-2">
+          <div className="flex items-center space-x-2 pr-6">
             {editingFolder ? (
-              <FolderCheck className="w-5 h-5 text-[#4c4993]" />
+              <FolderCheck className="w-5 h-5 text-[#4c4993] shrink-0" />
             ) : (
-              <FolderPlus className="w-5 h-5 text-[#4c4993]" />
+              <FolderPlus className="w-5 h-5 text-[#4c4993] shrink-0" />
             )}
-            <h3 className="font-black text-lg text-[#4c4993]">
+            <h3 className="font-black text-lg text-[#4c4993] truncate">
               {editingFolder ? `編輯場次資料夾：${editingFolder.name}` : '新增場次資料夾'}
             </h3>
           </div>
           <button
-            onClick={onClose}
-            className="text-[#4c4993]/60 hover:text-[#4c4993] p-1 rounded hover:bg-[#bfc9eb]/30 transition cursor-pointer"
+            type="button"
+            onClick={handleModalClose}
+            className="text-[#4c4993]/60 hover:text-[#4c4993] p-1.5 rounded-lg hover:bg-[#bfc9eb]/40 transition cursor-pointer shrink-0 border border-[#bfc9eb]/60 bg-white shadow-xs"
+            title="關閉彈窗"
           >
-            <X className="w-4 h-4" />
+            <X className="w-4 h-4 text-[#4c4993]" />
           </button>
         </div>
 
@@ -138,7 +152,7 @@ export default function FolderModal({ isOpen, onClose, editingFolder = null }) {
             <div className="flex justify-end gap-2 pt-1">
               <button
                 type="button"
-                onClick={onClose}
+                onClick={handleModalClose}
                 className="px-3.5 py-1.5 text-xs font-bold text-[#4c4993] bg-[#f4f5f1] hover:bg-[#bfc9eb]/30 rounded-md border border-[#bfc9eb] transition cursor-pointer"
               >
                 取消
