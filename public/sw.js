@@ -1,4 +1,4 @@
-const CACHE_NAME = 'collecttrack-v1';
+const CACHE_NAME = 'collecttrack-v2';
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
@@ -6,7 +6,7 @@ const ASSETS_TO_CACHE = [
   '/favicon.svg'
 ];
 
-// 安裝 Service Worker 並預快取核心資產
+// 安裝 Service Worker
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
@@ -15,7 +15,7 @@ self.addEventListener('install', (event) => {
   );
 });
 
-// 啟用 Service Worker 並清除舊版快取
+// 啟用 Service Worker 並即時清除所有舊版快取
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((keys) => {
@@ -30,13 +30,16 @@ self.addEventListener('activate', (event) => {
   );
 });
 
-// 離線優先快取策略 (Stale-While-Revalidate)
+// ⭐ 網路優先 (Network-First) 策略，確保每此發布與重新整理都能立刻獲取最新程式碼 ⭐
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
+  
+  // 忽略非 HTTP/HTTPS 請求 (如 chrome-extension)
+  if (!event.request.url.startsWith('http')) return;
 
   event.respondWith(
-    caches.match(event.request).then((cachedResponse) => {
-      const fetchPromise = fetch(event.request).then((networkResponse) => {
+    fetch(event.request)
+      .then((networkResponse) => {
         if (networkResponse && networkResponse.status === 200 && networkResponse.type === 'basic') {
           const responseToCache = networkResponse.clone();
           caches.open(CACHE_NAME).then((cache) => {
@@ -44,12 +47,10 @@ self.addEventListener('fetch', (event) => {
           });
         }
         return networkResponse;
-      }).catch(() => {
-        // 離線時 fallback 回傳快取 response
-        return cachedResponse;
-      });
-
-      return cachedResponse || fetchPromise;
-    })
+      })
+      .catch(() => {
+        // 僅當斷網/完全離線時，才 Fallback 到離線快取
+        return caches.match(event.request);
+      })
   );
 });
