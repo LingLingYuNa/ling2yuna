@@ -234,12 +234,11 @@ export function AppProvider({ children }) {
     return () => { isMounted = false; };
   }, [selectedColumnId]);
 
-  // ⭐ 新增或更新專欄（正確精準處理 folderId: null 顯式傳入）⭐
+  // 新增或更新專欄
   const handleSaveColumn = async (columnData) => {
     const isEdit = !!columnData.id;
     const now = new Date().toISOString();
     
-    // 正確判斷是否傳入了 folderId (包括 null)
     let assignedFolderId = null;
     if (Object.prototype.hasOwnProperty.call(columnData, 'folderId')) {
       assignedFolderId = columnData.folderId;
@@ -267,7 +266,7 @@ export function AppProvider({ children }) {
     setEditingColumn(null);
   };
 
-  // 刪除專欄
+  // 刪除單個專欄
   const handleDeleteColumn = async (id) => {
     if (!window.confirm('確定要刪除此專欄嗎？專欄內的所有圖片與留言記帳也將一併刪除！')) return;
     await dbDeleteColumn(id);
@@ -276,6 +275,34 @@ export function AppProvider({ children }) {
     if (selectedColumnId === id) {
       setSelectedColumnId(null);
     }
+  };
+
+  // ⭐ 一鍵刪除今天 (或由 Excel 匯入) 的專欄 ⭐
+  const handleDeleteTodayExcelColumns = async () => {
+    const todayStr = new Date().toISOString().split('T')[0]; // 例如 "2026-09-02"
+    
+    // 尋找今天建立或 ID 包含 col-excel- 的專欄
+    const targets = columns.filter(c => {
+      const isToday = c.createdAt && c.createdAt.startsWith(todayStr);
+      const isExcel = c.id && c.id.includes('excel');
+      return isToday || isExcel;
+    });
+
+    if (targets.length === 0) {
+      alert('目前沒有找到今天或由 Excel 匯入的專欄！');
+      return;
+    }
+
+    if (!window.confirm(`⚠️ 確定要一次刪除今天匯入/建立的共 ${targets.length} 個專欄嗎？此動作無法復原！`)) {
+      return;
+    }
+
+    for (const col of targets) {
+      await dbDeleteColumn(col.id);
+    }
+
+    await refreshColumns();
+    alert(`已成功刪除 ${targets.length} 個今天匯入的專欄！`);
   };
 
   // 完全清空所有資料
@@ -448,6 +475,7 @@ export function AppProvider({ children }) {
         handleMoveAllColumnsBetweenFolders,
         handleSaveColumn,
         handleDeleteColumn,
+        handleDeleteTodayExcelColumns,
         handleResetData,
         handleToggleFavorite,
         handleAddComment,

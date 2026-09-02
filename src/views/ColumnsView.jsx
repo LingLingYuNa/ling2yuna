@@ -20,6 +20,7 @@ export default function ColumnsView() {
     setIsFolderModalOpen,
     setEditingFolder,
     handleDeleteFolder,
+    handleDeleteTodayExcelColumns,
     handleToggleFavorite,
     setLightboxImage
   } = useApp();
@@ -315,7 +316,6 @@ export default function ColumnsView() {
               <h2 className="text-lg sm:text-xl font-black text-[#4c4993] tracking-tight flex items-center gap-2">
                 <span>{activeFolder ? `📁 ${activeFolder.name}` : '二次元專欄展示牆'}</span>
                 
-                {/* ⭐ 當選中特定資料夾時，提供一鍵管理與歸納轉移按鈕 ⭐ */}
                 {activeFolder && (
                   <button
                     onClick={() => {
@@ -388,6 +388,16 @@ export default function ColumnsView() {
                 </div>
               )}
             </div>
+
+            {/* ⭐ 一鍵清理今天 Excel 匯入按鈕 ⭐ */}
+            <button
+              onClick={handleDeleteTodayExcelColumns}
+              className="bg-red-50 hover:bg-red-100 text-red-700 font-bold text-xs px-2.5 py-1.5 rounded-lg border border-red-300 transition flex items-center gap-1 cursor-pointer shadow-xs"
+              title="一鍵清理復原今天由 Excel 批量匯入的所有專欄"
+            >
+              <Trash2 className="w-3.5 h-3.5 text-red-600" />
+              <span className="hidden sm:inline">清理今天 Excel 匯入</span>
+            </button>
 
             <button
               onClick={() => setIsExcelModalOpen(true)}

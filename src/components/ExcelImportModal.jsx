@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
-import { X, FileSpreadsheet, Download, Upload, Check, AlertCircle, Sparkles } from 'lucide-react';
+import { X, FileSpreadsheet, Download, Upload, Check, AlertCircle, Sparkles, Trash2 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
 export default function ExcelImportModal({ isOpen, onClose }) {
-  const { handleSaveColumn, refreshColumns } = useApp();
+  const { handleSaveColumn, handleDeleteTodayExcelColumns, refreshColumns } = useApp();
 
   const [parsedRows, setParsedRows] = useState([]);
   const [fileName, setFileName] = useState('');
@@ -33,13 +33,12 @@ export default function ExcelImportModal({ isOpen, onClose }) {
     ];
 
     const worksheet = XLSX.utils.json_to_sheet(templateData);
-    // 設定欄寬
     worksheet['!cols'] = [
-      { wch: 22 }, // 專欄名稱
-      { wch: 14 }, // 專欄分類
-      { wch: 40 }, // 專欄簡介
-      { wch: 20 }, // 標籤
-      { wch: 45 }  // 封面圖片網址
+      { wch: 22 },
+      { wch: 14 },
+      { wch: 40 },
+      { wch: 20 },
+      { wch: 45 }
     ];
 
     const workbook = XLSX.utils.book_new();
@@ -70,7 +69,6 @@ export default function ExcelImportModal({ isOpen, onClose }) {
           return;
         }
 
-        // 轉換標頭欄位 mapping
         const mappedData = json.map((row, index) => {
           const title = row['專欄名稱'] || row['title'] || row['Title'] || `匯入專欄 ${index + 1}`;
           const category = row['專欄分類'] || row['category'] || row['Category'] || '宣圖';
@@ -106,14 +104,17 @@ export default function ExcelImportModal({ isOpen, onClose }) {
     setIsImporting(true);
 
     try {
-      for (const row of parsedRows) {
+      const now = new Date().toISOString();
+      for (let idx = 0; idx < parsedRows.length; idx++) {
+        const row = parsedRows[idx];
         await handleSaveColumn({
+          id: `col-excel-${Date.now()}-${idx}`,
           title: row.title,
           category: row.category || '宣圖',
           description: row.description,
           tags: row.tags,
           coverImage: row.coverImage,
-          createdAt: new Date().toISOString()
+          createdAt: now
         });
       }
 
@@ -125,6 +126,12 @@ export default function ExcelImportModal({ isOpen, onClose }) {
       setErrorMsg('匯入過程發生錯誤：' + err.message);
       setIsImporting(false);
     }
+  };
+
+  // 執行刪除今日匯入的專欄
+  const handleCleanTodayImported = async () => {
+    await handleDeleteTodayExcelColumns();
+    onClose();
   };
 
   return (
@@ -145,7 +152,22 @@ export default function ExcelImportModal({ isOpen, onClose }) {
         </div>
 
         <div className="space-y-3.5 pt-3.5 overflow-y-auto pr-1 flex-1">
-          {/* 步驟指引與下載範本按鈕 (2R 微圓角) */}
+          {/* ⭐ 快捷一鍵刪除今日/Excel匯入專欄區塊 ⭐ */}
+          <div className="bg-[#161348] text-white p-3 rounded-lg flex items-center justify-between shadow-xs">
+            <div className="flex items-center space-x-2">
+              <Trash2 className="w-4 h-4 text-red-400" />
+              <span className="text-xs font-black">誤匯入或想清理今天匯入的專欄？</span>
+            </div>
+            <button
+              type="button"
+              onClick={handleCleanTodayImported}
+              className="bg-red-600 hover:bg-red-700 text-white font-black text-xs px-3 py-1.5 rounded-md transition flex items-center gap-1 cursor-pointer shadow-xs"
+            >
+              <span>刪除今天匯入的專欄</span>
+            </button>
+          </div>
+
+          {/* 步驟指引與下載範本按鈕 */}
           <div className="bg-white p-3.5 rounded-lg border border-[#bfc9eb] shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
               <span className="text-xs font-black text-[#4c4993] block mb-0.5">
@@ -165,7 +187,7 @@ export default function ExcelImportModal({ isOpen, onClose }) {
             </button>
           </div>
 
-          {/* 上傳 Excel 區域 (2R 導角) */}
+          {/* 上傳 Excel 區域 */}
           <div className="relative border-2 border-dashed border-[#bfc9eb] hover:border-[#4c4993] rounded-lg p-5 text-center bg-white transition cursor-pointer group">
             <input
               type="file"
@@ -190,7 +212,7 @@ export default function ExcelImportModal({ isOpen, onClose }) {
             </div>
           )}
 
-          {/* 數據即時預覽表格 (Data Preview Table) */}
+          {/* 數據即時預覽表格 */}
           {parsedRows.length > 0 && (
             <div className="space-y-2">
               <div className="flex items-center justify-between">
@@ -234,7 +256,7 @@ export default function ExcelImportModal({ isOpen, onClose }) {
           )}
         </div>
 
-        {/* Footer Actions (2R 導角) */}
+        {/* Footer Actions */}
         <div className="pt-3 mt-2 border-t border-[#bfc9eb]/50 flex gap-2">
           <button
             type="button"
