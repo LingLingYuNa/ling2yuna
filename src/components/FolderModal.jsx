@@ -66,11 +66,18 @@ export default function FolderModal({ isOpen, onClose, editingFolder = null }) {
     setTimeout(() => setTransferSuccess(false), 3000);
   };
 
-  // 將單個專欄移出資料夾
+  // ⭐ 將單個專欄精準移出場次資料夾 ⭐
   const handleRemoveSingleColumnFromFolder = async (columnObj) => {
     await handleSaveColumn({
-      ...columnObj,
-      folderId: null
+      id: columnObj.id,
+      title: columnObj.title,
+      description: columnObj.description,
+      category: columnObj.category,
+      coverImage: columnObj.coverImage,
+      tags: columnObj.tags,
+      isFavorite: columnObj.isFavorite,
+      createdAt: columnObj.createdAt,
+      folderId: null // 顯式賦予 null 解除場次歸類
     });
   };
 
@@ -145,7 +152,7 @@ export default function FolderModal({ isOpen, onClose, editingFolder = null }) {
             </div>
           </form>
 
-          {/* ⭐ 核心功能：一鍵將全部專欄歸納轉移至其他資料夾 ⭐ */}
+          {/* 一鍵將全部專欄歸納轉移至其他資料夾 */}
           {editingFolder && (
             <div className="pt-4 border-t border-[#4c4993]/20 space-y-3">
               <div className="flex items-center space-x-1.5">
@@ -210,7 +217,7 @@ export default function FolderModal({ isOpen, onClose, editingFolder = null }) {
                         <button
                           type="button"
                           onClick={() => handleRemoveSingleColumnFromFolder(col)}
-                          className="text-[10px] text-[#4c4993] hover:text-red-600 underline font-semibold cursor-pointer shrink-0"
+                          className="text-[10px] text-[#e11d48] hover:underline font-extrabold cursor-pointer shrink-0 border border-[#e11d48]/30 px-2 py-0.5 rounded bg-red-50"
                         >
                           移出場次
                         </button>

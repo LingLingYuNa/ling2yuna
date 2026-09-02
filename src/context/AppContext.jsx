@@ -143,7 +143,7 @@ export function AppProvider({ children }) {
     if (!window.confirm('確定要刪除這個場次資料夾嗎？裡面的專欄將會自動保留並移至未分類！')) return;
     await dbDeleteFolder(id);
     
-    // 更新原本歸屬於此 folder 的專欄為未分類
+    // 更新原本歸屬於此 folder 的專欄為未分類 (folderId: null)
     const affected = columns.filter(c => c.folderId === id);
     for (const col of affected) {
       await saveColumn({ ...col, folderId: null });
@@ -155,7 +155,7 @@ export function AppProvider({ children }) {
     await refreshColumns();
   };
 
-  // ⭐ 📁 一鍵將 A 資料夾裡的所有專欄批量轉移至 B 資料夾 ⭐
+  // 📁 一鍵將 A 資料夾裡的所有專欄批量轉移至 B 資料夾
   const handleMoveAllColumnsBetweenFolders = async (sourceFolderId, targetFolderId) => {
     if (!sourceFolderId) return;
     const destId = (targetFolderId === 'NONE' || !targetFolderId) ? null : targetFolderId;
@@ -234,13 +234,22 @@ export function AppProvider({ children }) {
     return () => { isMounted = false; };
   }, [selectedColumnId]);
 
-  // 新增或更新專欄
+  // ⭐ 新增或更新專欄（正確精準處理 folderId: null 顯式傳入）⭐
   const handleSaveColumn = async (columnData) => {
     const isEdit = !!columnData.id;
     const now = new Date().toISOString();
+    
+    // 正確判斷是否傳入了 folderId (包括 null)
+    let assignedFolderId = null;
+    if (Object.prototype.hasOwnProperty.call(columnData, 'folderId')) {
+      assignedFolderId = columnData.folderId;
+    } else {
+      assignedFolderId = (selectedFolderId !== 'ALL' && selectedFolderId !== 'UNASSIGNED') ? selectedFolderId : null;
+    }
+
     const newCol = {
       id: columnData.id || `col-${Date.now()}`,
-      folderId: columnData.folderId || (selectedFolderId !== 'ALL' && selectedFolderId !== 'UNASSIGNED' ? selectedFolderId : null),
+      folderId: assignedFolderId,
       title: columnData.title || '無標題專欄',
       description: columnData.description || '',
       category: columnData.category || '宣圖',
@@ -250,6 +259,7 @@ export function AppProvider({ children }) {
       createdAt: columnData.createdAt || now,
       updatedAt: now
     };
+
     await saveColumn(newCol);
     await refreshColumns();
     if (!isEdit) setSelectedColumnId(newCol.id);
