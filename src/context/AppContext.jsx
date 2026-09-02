@@ -30,23 +30,31 @@ export function AppProvider({ children }) {
 
   // 網頁狀態持久化
   const [selectedColumnId, setSelectedColumnIdState] = useState(() => {
-    const hash = window.location.hash;
-    if (hash && hash.startsWith('#column/')) {
-      return hash.replace('#column/', '');
+    try {
+      const hash = window.location.hash;
+      if (hash && hash.startsWith('#column/')) {
+        return hash.replace('#column/', '');
+      }
+      const savedId = localStorage.getItem('collecttrack_selected_column_id');
+      return savedId === 'HOME' ? null : savedId || null;
+    } catch {
+      return null;
     }
-    const savedId = localStorage.getItem('collecttrack_selected_column_id');
-    return savedId === 'HOME' ? null : savedId || null;
   });
 
   // 包裝 setSelectedColumnId，在切換頁面時同步 Push History State
   const setSelectedColumnId = (id) => {
-    if (id) {
-      sessionStorage.setItem('collecttrack_scroll_pos', window.scrollY.toString());
-      localStorage.setItem('collecttrack_selected_column_id', id);
-      window.history.pushState({ page: 'detail', id }, '', `#column/${id}`);
-    } else {
-      localStorage.setItem('collecttrack_selected_column_id', 'HOME');
-      window.history.pushState({ page: 'home' }, '', window.location.pathname);
+    try {
+      if (id) {
+        sessionStorage.setItem('collecttrack_scroll_pos', window.scrollY.toString());
+        localStorage.setItem('collecttrack_selected_column_id', id);
+        window.history.pushState({ page: 'detail', id }, '', `#column/${id}`);
+      } else {
+        localStorage.setItem('collecttrack_selected_column_id', 'HOME');
+        window.history.pushState({ page: 'home' }, '', window.location.pathname);
+      }
+    } catch (e) {
+      console.warn('History push failed:', e);
     }
     setSelectedColumnIdState(id);
   };
@@ -56,14 +64,16 @@ export function AppProvider({ children }) {
     let lastBackPressTime = 0;
     let toastTimer = null;
 
-    if (!window.history.state) {
-      window.history.replaceState({ page: selectedColumnId ? 'detail' : 'home' }, '');
-    }
+    try {
+      if (!window.history.state) {
+        window.history.replaceState({ page: selectedColumnId ? 'detail' : 'home' }, '');
+      }
+    } catch {}
 
     const handlePopState = () => {
       if (selectedColumnId) {
         setSelectedColumnIdState(null);
-        localStorage.setItem('collecttrack_selected_column_id', 'HOME');
+        try { localStorage.setItem('collecttrack_selected_column_id', 'HOME'); } catch {}
         return;
       }
 
@@ -78,7 +88,7 @@ export function AppProvider({ children }) {
           setExitToastVisible(false);
         }, 2000);
 
-        window.history.pushState({ page: 'home' }, '', window.location.pathname);
+        try { window.history.pushState({ page: 'home' }, '', window.location.pathname); } catch {}
       }
     };
 
@@ -109,21 +119,26 @@ export function AppProvider({ children }) {
     }, 50);
   };
 
-  // 載入專欄與資料夾數據
+  // 載入專欄與資料夾數據 (安全捕獲 IndexedDB 錯誤防白屏)
   const refreshColumns = async () => {
     try {
       const [colData, folderData] = await Promise.all([
-        getAllColumns(),
-        getAllFolders()
+        getAllColumns().catch(err => { console.error('getAllColumns error:', err); return []; }),
+        getAllFolders().catch(err => { console.error('getAllFolders error:', err); return []; })
       ]);
-      setColumns(colData);
-      setFolders(folderData);
+      const validCols = Array.isArray(colData) ? colData : [];
+      const validFolders = Array.isArray(folderData) ? folderData : [];
 
-      if (selectedColumnId && !colData.some(c => c.id === selectedColumnId)) {
+      setColumns(validCols);
+      setFolders(validFolders);
+
+      if (selectedColumnId && !validCols.some(c => c.id === selectedColumnId)) {
         setSelectedColumnIdState(null);
       }
     } catch (err) {
       console.error('Failed to load columns/folders:', err);
+      setColumns([]);
+      setFolders([]);
     }
   };
 
@@ -183,7 +198,7 @@ export function AppProvider({ children }) {
     await refreshColumns();
   };
 
-  // ⭐ 📁 將勾選的多個指定專欄一鍵批量歸納轉移至目標資料夾 ⭐
+  // 📁 將勾選的多個指定專欄一鍵批量歸納轉移至目標資料夾
   const handleMoveSelectedColumnsToFolder = async (columnIds = [], targetFolderId) => {
     if (!columnIds || columnIds.length === 0) return;
     const destId = (targetFolderId === 'NONE' || !targetFolderId) ? null : targetFolderId;
@@ -243,12 +258,12 @@ export function AppProvider({ children }) {
     const loadSubData = async () => {
       try {
         const [commentsData, imagesData] = await Promise.all([
-          getCommentsByColumn(selectedColumnId),
-          getImagesByColumn(selectedColumnId)
+          getCommentsByColumn(selectedColumnId).catch(() => []),
+          getImagesByColumn(selectedColumnId).catch(() => [])
         ]);
         if (isMounted) {
-          setColumnComments(commentsData);
-          setColumnImages(imagesData);
+          setColumnComments(Array.isArray(commentsData) ? commentsData : []);
+          setColumnImages(Array.isArray(imagesData) ? imagesData : []);
         }
       } catch (err) {
         console.error('Error loading sub data for column:', err);

@@ -1,5 +1,6 @@
 import React from 'react';
 import { AppProvider } from './context/AppContext';
+import ErrorBoundary from './components/ErrorBoundary';
 import Navigation from './components/Navigation';
 import ColumnModal from './components/ColumnModal';
 import ImageUploadModal from './components/ImageUploadModal';
@@ -16,16 +17,18 @@ function MainContent() {
 
 export default function App() {
   return (
-    <AppProvider>
-      <div className="min-h-screen bg-transparent text-[#4c4993] font-sans selection:bg-[#4c4993] selection:text-white">
-        <Navigation />
-        <MainContent />
+    <ErrorBoundary>
+      <AppProvider>
+        <div className="min-h-screen bg-transparent text-[#4c4993] font-sans selection:bg-[#4c4993] selection:text-white">
+          <Navigation />
+          <MainContent />
 
-        {/* 全局 Modals */}
-        <ColumnModal />
-        <ImageUploadModal />
-        <LightboxModal />
-      </div>
-    </AppProvider>
+          {/* 全局 Modals */}
+          <ColumnModal />
+          <ImageUploadModal />
+          <LightboxModal />
+        </div>
+      </AppProvider>
+    </ErrorBoundary>
   );
 }
