@@ -5,7 +5,7 @@ import ExcelImportModal from '../components/ExcelImportModal';
 import FolderModal from '../components/FolderModal';
 import { generateAllColumnsTextReport, downloadTextFile, exportCommentsToExcel } from '../utils/exportUtils';
 import { getCommentsByColumn } from '../db/indexedDB';
-import { Plus, FolderHeart, ArrowRight, Sparkles, Image as ImageIcon, FileSpreadsheet, ArrowUpDown, Clock, RefreshCw, Heart, Search, X, MapPin, ChevronDown, ChevronUp, Maximize2, Download, FileText, Copy, Check, Folder, FolderPlus, Edit3, Trash2, Tag, ArrowRightLeft, CheckSquare, Square } from 'lucide-react';
+import { Plus, FolderHeart, ArrowRight, Sparkles, Image as ImageIcon, FileSpreadsheet, ArrowUpDown, Clock, RefreshCw, Heart, Search, X, Download, FileText, Copy, Check, Folder, FolderPlus, Edit3, Trash2, Tag, ArrowRightLeft, CheckSquare, Square } from 'lucide-react';
 
 export default function ColumnsView() {
   const {
@@ -29,9 +29,6 @@ export default function ColumnsView() {
 
   const [isExcelModalOpen, setIsExcelModalOpen] = useState(false);
 
-  // 攤位對照圖摺疊狀態 (預設展開供對照)
-  const [showBoothMap, setShowBoothMap] = useState(true);
-
   // 專欄搜尋與排序模式
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState('updated_desc');
@@ -41,7 +38,7 @@ export default function ColumnsView() {
   const [copiedText, setCopiedText] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
 
-  // ⭐ 核心新功能：專欄多選批量歸納模式 ⭐
+  // 專欄多選批量歸納模式
   const [isBatchMoveMode, setIsBatchMoveMode] = useState(false);
   const [selectedColumnIds, setSelectedColumnIds] = useState([]);
   const [targetFolderIdForBatch, setTargetFolderIdForBatch] = useState('');
@@ -175,7 +172,7 @@ export default function ColumnsView() {
   // 取得目前選取的場次資料夾物件
   const activeFolder = folders.find(f => f.id === selectedFolderId);
 
-  // ⭐ 批次多選勾選切換 ⭐
+  // 批次多選勾選切換
   const toggleColumnSelection = (id) => {
     setSelectedColumnIds((prev) =>
       prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]
@@ -213,52 +210,7 @@ export default function ColumnsView() {
   return (
     <div className="space-y-4 sm:space-y-5 animate-fade-in pb-12">
       
-      {/* 頂端：同人展/場次攤位對照圖區塊 */}
-      <div className="bg-white rounded-lg border border-[#4c4993]/30 overflow-hidden shadow-xs">
-        <div
-          onClick={() => setShowBoothMap(!showBoothMap)}
-          className="px-4 py-3 bg-gradient-to-r from-[#161348] to-[#2d287d] text-white flex items-center justify-between cursor-pointer hover:bg-opacity-90 transition select-none"
-        >
-          <div className="flex items-center space-x-2">
-            <MapPin className="w-4 h-4 text-[#a1cdc4] animate-pulse" />
-            <h3 className="text-xs sm:text-sm font-black tracking-tight">
-              📍 展場攤位對照圖 (C / D / E 區 攤位號碼表)
-            </h3>
-          </div>
-
-          <div className="flex items-center space-x-2 text-xs font-bold text-[#a1cdc4]">
-            <span>{showBoothMap ? '點擊收合' : '點擊展開查看'}</span>
-            {showBoothMap ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-          </div>
-        </div>
-
-        {showBoothMap && (
-          <div className="p-3 sm:p-4 bg-[#f4f5f1] border-t border-[#4c4993]/20 flex flex-col items-center justify-center animate-fade-in">
-            <div className="relative group max-w-xl w-full rounded-lg overflow-hidden border border-[#bfc9eb] bg-[#f4f5f1] shadow-xs">
-              <img
-                src="/booth_map.jpg"
-                alt="展場攤位對照圖 (C, D, E 區)"
-                className="w-full h-auto object-contain max-h-[480px] mx-auto block cursor-pointer"
-                onClick={() => setLightboxImage({ url: '/booth_map.jpg', caption: '📍 展場攤位對照圖 (C / D / E 區)' })}
-              />
-              <div
-                onClick={() => setLightboxImage({ url: '/booth_map.jpg', caption: '📍 展場攤位對照圖 (C / D / E 區)' })}
-                className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition flex items-center justify-center cursor-pointer"
-              >
-                <span className="bg-[#161348] text-white text-xs font-black px-3 py-1.5 rounded-md flex items-center gap-1.5 shadow-lg">
-                  <Maximize2 className="w-3.5 h-3.5 text-[#a1cdc4]" />
-                  點擊放大對照圖
-                </span>
-              </div>
-            </div>
-            <p className="text-[10px] text-[#4c4993]/80 font-bold mt-2 text-center">
-              💡 提示：點擊圖片可放大全螢幕查看或在新分頁中開啟對照
-            </p>
-          </div>
-        )}
-      </div>
-
-      {/* 核心同人展場次 / 資料夾頁籤列 (Folder Tabs Bar) */}
+      {/* 同人展場次 / 資料夾頁籤列 (Folder Tabs Bar) */}
       <div className="bg-[#f4f5f1] border border-[#bfc9eb] rounded-lg p-2.5 shadow-xs space-y-2">
         <div className="flex items-center justify-between px-1">
           <div className="flex items-center space-x-1.5">
@@ -267,7 +219,7 @@ export default function ColumnsView() {
           </div>
 
           <div className="flex items-center space-x-1.5">
-            {/* ⭐ 勾選多個專欄批次轉移按鈕 ⭐ */}
+            {/* 勾選多個專欄批次轉移按鈕 */}
             <button
               onClick={() => {
                 setIsBatchMoveMode(!isBatchMoveMode);
@@ -296,7 +248,7 @@ export default function ColumnsView() {
           </div>
         </div>
 
-        {/* ⭐ 多選批量轉移控制條 (在多選模式開啟時呈現) ⭐ */}
+        {/* 多選批量轉移控制條 (在多選模式開啟時呈現) */}
         {isBatchMoveMode && (
           <div className="bg-[#161348] text-white p-3 rounded-lg flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 animate-fade-in border border-[#a1cdc4]">
             <div className="flex items-center space-x-2">
@@ -652,7 +604,7 @@ export default function ColumnsView() {
                       </div>
                     )}
 
-                    {/* ⭐ 多選模式下的勾選控制 Checkbox ⭐ */}
+                    {/* 多選模式下的勾選控制 Checkbox */}
                     {isBatchMoveMode ? (
                       <div className="absolute top-2 right-2 z-20">
                         {isSelectedForBatch ? (
