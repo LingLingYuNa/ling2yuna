@@ -3,7 +3,7 @@ import { useApp } from '../context/AppContext';
 import { X, FolderPlus, FolderCheck, ArrowRightLeft, Check } from 'lucide-react';
 
 export default function FolderModal({ isOpen, onClose, editingFolder = null }) {
-  const { folders, columns, handleSaveFolder, handleMoveAllColumnsBetweenFolders, handleSaveColumn, setEditingFolder } = useApp();
+  const { folders, columns, handleSaveFolder, handleMoveAllColumnsBetweenFolders, handleSaveColumn, closeFolderModal } = useApp();
 
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
@@ -31,14 +31,16 @@ export default function FolderModal({ isOpen, onClose, editingFolder = null }) {
 
   if (!isOpen) return null;
 
-  // ⭐ 徹底防止表單提交與冒泡的安全關閉函數 ⭐
   const handleModalClose = (e) => {
     if (e) {
       e.preventDefault();
       e.stopPropagation();
     }
-    if (setEditingFolder) setEditingFolder(null);
-    onClose();
+    if (closeFolderModal) {
+      closeFolderModal();
+    } else {
+      onClose();
+    }
   };
 
   const handleSubmit = (e) => {
@@ -52,8 +54,6 @@ export default function FolderModal({ isOpen, onClose, editingFolder = null }) {
       description: description.trim(),
       createdAt: editingFolder?.createdAt
     });
-
-    handleModalClose(e);
   };
 
   // 處理批量轉移所有專欄至另一個資料夾
@@ -109,7 +109,7 @@ export default function FolderModal({ isOpen, onClose, editingFolder = null }) {
         onClick={(e) => e.stopPropagation()}
         className="w-full max-w-md bg-[#f4f5f1] border border-[#bfc9eb] rounded-lg shadow-xl p-5 overflow-hidden animate-slide-up max-h-[90vh] flex flex-col relative"
       >
-        {/* Header */}
+        {/* Header (在 form 外部) */}
         <div className="flex items-center justify-between pb-3 border-b border-[#bfc9eb]/50">
           <div className="flex items-center space-x-2 pr-6">
             {editingFolder ? (
@@ -179,7 +179,7 @@ export default function FolderModal({ isOpen, onClose, editingFolder = null }) {
             </div>
           </form>
 
-          {/* 一鍵將全部專欄歸納轉移至其他資料夾 */}
+          {/* 一鍵將全部專欄歸納轉移至其他資料夾 (在 form 外部) */}
           {editingFolder && (
             <div className="pt-4 border-t border-[#4c4993]/20 space-y-3">
               <div className="flex items-center space-x-1.5">

@@ -101,6 +101,14 @@ export function AppProvider({ children }) {
   const [lightboxImage, setLightboxImage] = useState(null);
   const [editingColumn, setEditingColumn] = useState(null);
 
+  // ⭐ 乾淨關閉資料夾 Modal 並同步清除 editingFolder 狀態 ⭐
+  const closeFolderModal = () => {
+    setIsFolderModalOpen(false);
+    setTimeout(() => {
+      setEditingFolder(null);
+    }, 50);
+  };
+
   // 載入專欄與資料夾數據
   const refreshColumns = async () => {
     try {
@@ -134,8 +142,7 @@ export function AppProvider({ children }) {
     await dbSaveFolder(newFolder);
     await refreshColumns();
     setSelectedFolderId(newFolder.id);
-    setIsFolderModalOpen(false);
-    setEditingFolder(null);
+    closeFolderModal();
   };
 
   // 📁 刪除場次資料夾（歸類回預設未分類）
@@ -143,7 +150,6 @@ export function AppProvider({ children }) {
     if (!window.confirm('確定要刪除這個場次資料夾嗎？裡面的專欄將會自動保留並移至未分類！')) return;
     await dbDeleteFolder(id);
     
-    // 更新原本歸屬於此 folder 的專欄為未分類 (folderId: null)
     const affected = columns.filter(c => c.folderId === id);
     for (const col of affected) {
       await saveColumn({ ...col, folderId: null });
@@ -277,11 +283,10 @@ export function AppProvider({ children }) {
     }
   };
 
-  // ⭐ 一鍵刪除今天 (或由 Excel 匯入) 的專欄 ⭐
+  // 一鍵刪除今天 (或由 Excel 匯入) 的專欄
   const handleDeleteTodayExcelColumns = async () => {
-    const todayStr = new Date().toISOString().split('T')[0]; // 例如 "2026-09-02"
+    const todayStr = new Date().toISOString().split('T')[0];
     
-    // 尋找今天建立或 ID 包含 col-excel- 的專欄
     const targets = columns.filter(c => {
       const isToday = c.createdAt && c.createdAt.startsWith(todayStr);
       const isExcel = c.id && c.id.includes('excel');
@@ -462,6 +467,7 @@ export function AppProvider({ children }) {
         setIsImageModalOpen,
         isFolderModalOpen,
         setIsFolderModalOpen,
+        closeFolderModal,
         editingFolder,
         setEditingFolder,
         editingColumn,

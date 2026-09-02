@@ -18,6 +18,7 @@ export default function ColumnsView() {
     setIsColumnModalOpen,
     setEditingColumn,
     setIsFolderModalOpen,
+    closeFolderModal,
     setEditingFolder,
     handleDeleteFolder,
     handleDeleteTodayExcelColumns,
@@ -389,7 +390,7 @@ export default function ColumnsView() {
               )}
             </div>
 
-            {/* ⭐ 一鍵清理今天 Excel 匯入按鈕 ⭐ */}
+            {/* 一鍵清理今天 Excel 匯入按鈕 */}
             <button
               onClick={handleDeleteTodayExcelColumns}
               className="bg-red-50 hover:bg-red-100 text-red-700 font-bold text-xs px-2.5 py-1.5 rounded-lg border border-red-300 transition flex items-center gap-1 cursor-pointer shadow-xs"
@@ -618,7 +619,7 @@ export default function ColumnsView() {
       {/* 場次資料夾 Modal */}
       <FolderModal
         isOpen={useApp().isFolderModalOpen}
-        onClose={() => useApp().setIsFolderModalOpen(false)}
+        onClose={closeFolderModal}
         editingFolder={useApp().editingFolder}
       />
     </div>
