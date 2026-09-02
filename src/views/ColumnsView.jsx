@@ -5,7 +5,7 @@ import ExcelImportModal from '../components/ExcelImportModal';
 import FolderModal from '../components/FolderModal';
 import { generateAllColumnsTextReport, downloadTextFile, exportCommentsToExcel } from '../utils/exportUtils';
 import { getCommentsByColumn } from '../db/indexedDB';
-import { Plus, FolderHeart, ArrowRight, Sparkles, Image as ImageIcon, FileSpreadsheet, ArrowUpDown, Clock, RefreshCw, Heart, Search, X, Download, FileText, Copy, Check, Folder, FolderPlus, Edit3, Trash2, Tag, ArrowRightLeft, CheckSquare, Square } from 'lucide-react';
+import { Plus, FolderHeart, ArrowRight, Sparkles, Image as ImageIcon, FileSpreadsheet, ArrowUpDown, Clock, RefreshCw, Heart, Search, X, Download, FileText, Copy, Check, Folder, FolderPlus, Edit3, Trash2, Tag, ArrowRightLeft, CheckSquare, Square, ChevronDown } from 'lucide-react';
 
 export default function ColumnsView() {
   const {
