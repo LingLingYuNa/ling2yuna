@@ -5,7 +5,7 @@ import ExcelImportModal from '../components/ExcelImportModal';
 import FolderModal from '../components/FolderModal';
 import { generateAllColumnsTextReport, downloadTextFile, exportCommentsToExcel } from '../utils/exportUtils';
 import { getCommentsByColumn } from '../db/indexedDB';
-import { Plus, FolderHeart, ArrowRight, Sparkles, Image as ImageIcon, FileSpreadsheet, ArrowUpDown, Clock, RefreshCw, Heart, Search, X, MapPin, ChevronDown, ChevronUp, Maximize2, Download, FileText, Copy, Check, Folder, FolderPlus, Edit3, Trash2, Tag, ArrowRightLeft, Settings } from 'lucide-react';
+import { Plus, FolderHeart, ArrowRight, Sparkles, Image as ImageIcon, FileSpreadsheet, ArrowUpDown, Clock, RefreshCw, Heart, Search, X, MapPin, ChevronDown, ChevronUp, Maximize2, Download, FileText, Copy, Check, Folder, FolderPlus, Edit3, Trash2, Tag, ArrowRightLeft, CheckSquare, Square } from 'lucide-react';
 
 export default function ColumnsView() {
   const {
@@ -21,6 +21,7 @@ export default function ColumnsView() {
     closeFolderModal,
     setEditingFolder,
     handleDeleteFolder,
+    handleMoveSelectedColumnsToFolder,
     handleDeleteTodayExcelColumns,
     handleToggleFavorite,
     setLightboxImage
@@ -39,6 +40,11 @@ export default function ColumnsView() {
   const [isExportMenuOpen, setIsExportMenuOpen] = useState(false);
   const [copiedText, setCopiedText] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
+
+  // ⭐ 核心新功能：專欄多選批量歸納模式 ⭐
+  const [isBatchMoveMode, setIsBatchMoveMode] = useState(false);
+  const [selectedColumnIds, setSelectedColumnIds] = useState([]);
+  const [targetFolderIdForBatch, setTargetFolderIdForBatch] = useState('');
 
   // 自動恢復回到上一頁時的滾動位置
   useLayoutEffect(() => {
@@ -169,6 +175,37 @@ export default function ColumnsView() {
   // 取得目前選取的場次資料夾物件
   const activeFolder = folders.find(f => f.id === selectedFolderId);
 
+  // ⭐ 批次多選勾選切換 ⭐
+  const toggleColumnSelection = (id) => {
+    setSelectedColumnIds((prev) =>
+      prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]
+    );
+  };
+
+  const toggleSelectAllVisibleColumns = () => {
+    if (selectedColumnIds.length === filteredAndSortedColumns.length) {
+      setSelectedColumnIds([]);
+    } else {
+      setSelectedColumnIds(filteredAndSortedColumns.map(c => c.id));
+    }
+  };
+
+  // 執行將勾選的專欄一鍵轉移至目標場次資料夾
+  const executeBatchMove = async () => {
+    if (selectedColumnIds.length === 0) return;
+    const targetName = targetFolderIdForBatch === 'NONE'
+      ? '未分類'
+      : folders.find(f => f.id === targetFolderIdForBatch)?.name || '未分類';
+
+    if (!window.confirm(`確定要將已勾選的 ${selectedColumnIds.length} 個專欄，一鍵轉移至【${targetName}】嗎？`)) {
+      return;
+    }
+
+    await handleMoveSelectedColumnsToFolder(selectedColumnIds, targetFolderIdForBatch);
+    setSelectedColumnIds([]);
+    setIsBatchMoveMode(false);
+  };
+
   if (selectedColumnId) {
     return <ColumnDetailView />;
   }
@@ -229,17 +266,83 @@ export default function ColumnsView() {
             <span className="text-xs font-black text-[#4c4993]">場次 / 資料夾分類</span>
           </div>
 
-          <button
-            onClick={() => {
-              setEditingFolder(null);
-              setIsFolderModalOpen(true);
-            }}
-            className="text-xs font-black text-[#161348] bg-[#a1cdc4] hover:bg-[#8ebfb5] px-2.5 py-1 rounded-md transition flex items-center gap-1 cursor-pointer shadow-xs"
-          >
-            <FolderPlus className="w-3.5 h-3.5 text-[#161348]" />
-            <span>新增場次資料夾</span>
-          </button>
+          <div className="flex items-center space-x-1.5">
+            {/* ⭐ 勾選多個專欄批次轉移按鈕 ⭐ */}
+            <button
+              onClick={() => {
+                setIsBatchMoveMode(!isBatchMoveMode);
+                setSelectedColumnIds([]);
+              }}
+              className={`text-xs font-black px-2.5 py-1 rounded-md transition flex items-center gap-1 cursor-pointer shadow-xs border ${
+                isBatchMoveMode
+                  ? 'bg-red-600 text-white border-red-600'
+                  : 'bg-[#f4f5f1] hover:bg-white text-[#4c4993] border-[#bfc9eb]'
+              }`}
+            >
+              <CheckSquare className="w-3.5 h-3.5" />
+              <span>{isBatchMoveMode ? '退出勾選轉移' : '☑️ 勾選專欄轉移'}</span>
+            </button>
+
+            <button
+              onClick={() => {
+                setEditingFolder(null);
+                setIsFolderModalOpen(true);
+              }}
+              className="text-xs font-black text-[#161348] bg-[#a1cdc4] hover:bg-[#8ebfb5] px-2.5 py-1 rounded-md transition flex items-center gap-1 cursor-pointer shadow-xs"
+            >
+              <FolderPlus className="w-3.5 h-3.5 text-[#161348]" />
+              <span>新增場次資料夾</span>
+            </button>
+          </div>
         </div>
+
+        {/* ⭐ 多選批量轉移控制條 (在多選模式開啟時呈現) ⭐ */}
+        {isBatchMoveMode && (
+          <div className="bg-[#161348] text-white p-3 rounded-lg flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 animate-fade-in border border-[#a1cdc4]">
+            <div className="flex items-center space-x-2">
+              <button
+                onClick={toggleSelectAllVisibleColumns}
+                className="text-xs font-extrabold bg-[#f4f5f1] hover:bg-white text-[#161348] px-2.5 py-1 rounded cursor-pointer shadow-xs"
+              >
+                {selectedColumnIds.length === filteredAndSortedColumns.length ? '取消全選' : '全選可見專欄'}
+              </button>
+              <span className="text-xs font-bold text-[#a1cdc4]">
+                已勾選 <strong className="text-white text-sm font-mono">{selectedColumnIds.length}</strong> 個專欄
+              </span>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <select
+                value={targetFolderIdForBatch}
+                onChange={(e) => setTargetFolderIdForBatch(e.target.value)}
+                className="bg-white text-[#161348] border border-[#bfc9eb] rounded px-2 py-1 text-xs font-bold focus:outline-none cursor-pointer flex-1 sm:flex-none"
+              >
+                <option value="">-- 選擇目標場次 / 資料夾 --</option>
+                <option value="NONE">📂 移至「未分類專欄」</option>
+                {folders.map(f => (
+                  <option key={f.id} value={f.id}>
+                    📁 轉移至【{f.name}】
+                  </option>
+                ))}
+              </select>
+
+              <button
+                onClick={executeBatchMove}
+                disabled={selectedColumnIds.length === 0 || !targetFolderIdForBatch}
+                className="bg-[#a1cdc4] hover:bg-[#8ebfb5] disabled:opacity-50 text-[#161348] font-black text-xs px-3.5 py-1 rounded transition shadow-xs cursor-pointer shrink-0"
+              >
+                一鍵轉移 ({selectedColumnIds.length})
+              </button>
+
+              <button
+                onClick={() => { setIsBatchMoveMode(false); setSelectedColumnIds([]); }}
+                className="text-xs text-white/80 hover:text-white underline cursor-pointer px-1"
+              >
+                取消
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* 橫向可滾動資料夾頁籤列表 */}
         <div className="flex items-center gap-1.5 overflow-x-auto pb-1 pt-0.5 scrollbar-none">
@@ -515,12 +618,23 @@ export default function ColumnsView() {
         <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-5 items-start">
           {filteredAndSortedColumns.map((col) => {
             const folderObj = folders.find(f => f.id === col.folderId);
+            const isSelectedForBatch = selectedColumnIds.includes(col.id);
 
             return (
               <div
                 key={col.id}
-                onClick={() => setSelectedColumnId(col.id)}
-                className="group glass-card rounded-lg overflow-hidden cursor-pointer transition-all duration-200 hover:-translate-y-0.5 flex flex-col justify-between h-full relative"
+                onClick={() => {
+                  if (isBatchMoveMode) {
+                    toggleColumnSelection(col.id);
+                  } else {
+                    setSelectedColumnId(col.id);
+                  }
+                }}
+                className={`group glass-card rounded-lg overflow-hidden cursor-pointer transition-all duration-200 hover:-translate-y-0.5 flex flex-col justify-between h-full relative ${
+                  isBatchMoveMode && isSelectedForBatch
+                    ? 'ring-2 ring-red-500 border-red-500 bg-red-50/20'
+                    : ''
+                }`}
               >
                 <div>
                   {/* 封面圖 */}
@@ -538,6 +652,37 @@ export default function ColumnsView() {
                       </div>
                     )}
 
+                    {/* ⭐ 多選模式下的勾選控制 Checkbox ⭐ */}
+                    {isBatchMoveMode ? (
+                      <div className="absolute top-2 right-2 z-20">
+                        {isSelectedForBatch ? (
+                          <div className="p-1 bg-red-600 text-white rounded-md shadow-md animate-scale-up">
+                            <CheckSquare className="w-4 h-4" />
+                          </div>
+                        ) : (
+                          <div className="p-1 bg-black/40 text-white/80 rounded-md shadow-md">
+                            <Square className="w-4 h-4" />
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      /* 頂部右側：我的最愛愛心按鈕 */
+                      <button
+                        type="button"
+                        onClick={(e) => handleToggleFavorite(col.id, e)}
+                        className="absolute top-2 right-2 p-1.5 rounded-full bg-black/40 hover:bg-black/60 transition cursor-pointer backdrop-blur-xs border border-white/40 shadow-md group/heart"
+                        title={col.isFavorite ? '取消收藏我的最愛' : '加入我的最愛'}
+                      >
+                        <Heart
+                          className={`w-3.5 h-3.5 transition-transform group-hover/heart:scale-110 ${
+                            col.isFavorite
+                              ? 'fill-[#e11d48] text-[#e11d48]'
+                              : 'text-white/90 hover:text-white'
+                          }`}
+                        />
+                      </button>
+                    )}
+
                     {/* 頂部左側：分類標籤 */}
                     <div className="absolute top-2 left-2 flex flex-col gap-1 items-start">
                       <span className="text-[10px] font-black px-2 py-0.5 rounded bg-[#4c4993] text-white shadow-xs border border-white/40">
@@ -549,22 +694,6 @@ export default function ColumnsView() {
                         </span>
                       )}
                     </div>
-
-                    {/* 頂部右側：我的最愛愛心按鈕 */}
-                    <button
-                      type="button"
-                      onClick={(e) => handleToggleFavorite(col.id, e)}
-                      className="absolute top-2 right-2 p-1.5 rounded-full bg-black/40 hover:bg-black/60 transition cursor-pointer backdrop-blur-xs border border-white/40 shadow-md group/heart"
-                      title={col.isFavorite ? '取消收藏我的最愛' : '加入我的最愛'}
-                    >
-                      <Heart
-                        className={`w-3.5 h-3.5 transition-transform group-hover/heart:scale-110 ${
-                          col.isFavorite
-                            ? 'fill-[#e11d48] text-[#e11d48]'
-                            : 'text-white/90 hover:text-white'
-                        }`}
-                      />
-                    </button>
 
                     {/* 封面圖下方花費膠囊 */}
                     <div className="absolute bottom-2 right-2">

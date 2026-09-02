@@ -101,7 +101,7 @@ export function AppProvider({ children }) {
   const [lightboxImage, setLightboxImage] = useState(null);
   const [editingColumn, setEditingColumn] = useState(null);
 
-  // ⭐ 乾淨關閉資料夾 Modal 並同步清除 editingFolder 狀態 ⭐
+  // 乾淨關閉資料夾 Modal 並同步清除 editingFolder 狀態
   const closeFolderModal = () => {
     setIsFolderModalOpen(false);
     setTimeout(() => {
@@ -177,6 +177,25 @@ export function AppProvider({ children }) {
         ...col,
         folderId: destId,
         updatedAt: new Date().toISOString()
+      });
+    }
+
+    await refreshColumns();
+  };
+
+  // ⭐ 📁 將勾選的多個指定專欄一鍵批量歸納轉移至目標資料夾 ⭐
+  const handleMoveSelectedColumnsToFolder = async (columnIds = [], targetFolderId) => {
+    if (!columnIds || columnIds.length === 0) return;
+    const destId = (targetFolderId === 'NONE' || !targetFolderId) ? null : targetFolderId;
+
+    const targets = columns.filter(c => columnIds.includes(c.id));
+    const now = new Date().toISOString();
+
+    for (const col of targets) {
+      await saveColumn({
+        ...col,
+        folderId: destId,
+        updatedAt: now
       });
     }
 
@@ -479,6 +498,7 @@ export function AppProvider({ children }) {
         handleSaveFolder,
         handleDeleteFolder,
         handleMoveAllColumnsBetweenFolders,
+        handleMoveSelectedColumnsToFolder,
         handleSaveColumn,
         handleDeleteColumn,
         handleDeleteTodayExcelColumns,
