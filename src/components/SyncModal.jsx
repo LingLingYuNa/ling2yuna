@@ -18,7 +18,7 @@ export default function SyncModal({ isOpen, onClose }) {
   const [googleUser, setGoogleUser] = useState(null);
   const [isAuthorizing, setIsAuthorizing] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
-  const [syncStatusMsg, setSyncStatusMsg] = useState(null); // { type: 'success'|'error', text: '' }
+  const [syncStatusMsg, setSyncStatusMsg] = useState(null); // { type: 'success'|'error'|'api_not_enabled', text: '' }
   const [lastSyncTime, setLastSyncTime] = useState('');
 
   // Client ID 設定狀態
@@ -106,7 +106,9 @@ export default function SyncModal({ isOpen, onClose }) {
       setSyncStatusMsg({ type: 'success', text: '☁️ 已成功將最新數據同步備份至 Google 雲端硬碟！' });
     } catch (err) {
       console.error('Upload error:', err);
-      if (err.message && err.message.includes('過期')) {
+      if (err.message === 'DRIVE_API_NOT_ENABLED') {
+        setSyncStatusMsg({ type: 'api_not_enabled', text: '您的 Google Console 專案尚未開啟「Google Drive API」功能。' });
+      } else if (err.message && err.message.includes('過期')) {
         setSyncStatusMsg({ type: 'error', text: 'Google 登入憑證已過期，請重新點擊登入！' });
       } else {
         setSyncStatusMsg({ type: 'error', text: `雲端上傳失敗: ${err.message || '請重新登入 Google 帳號'}` });
@@ -131,10 +133,12 @@ export default function SyncModal({ isOpen, onClose }) {
       setSyncStatusMsg({ type: 'success', text: '🎉 已成功從 Google 雲端下載並還原全量專欄與留言數據！' });
     } catch (err) {
       console.error('Download error:', err);
-      if (err.message && err.message.includes('過期')) {
+      if (err.message === 'DRIVE_API_NOT_ENABLED') {
+        setSyncStatusMsg({ type: 'api_not_enabled', text: '您的 Google Console 專案尚未開啟「Google Drive API」功能。' });
+      } else if (err.message && err.message.includes('過期')) {
         setSyncStatusMsg({ type: 'error', text: 'Google 登入憑證已過期，請重新點擊登入！' });
       } else {
-        setSyncStatusMsg({ type: 'error', text: `雲端還原失敗: ${err.message || '找不到雲端備份檔'}` });
+        setSyncStatusMsg({ type: 'error', text: `${err.message || '找不到雲端備份檔'}` });
       }
     } finally {
       setIsSyncing(false);
@@ -250,13 +254,29 @@ export default function SyncModal({ isOpen, onClose }) {
 
             {/* 提示訊息 Toast */}
             {syncStatusMsg && (
-              <div className={`p-2.5 rounded text-xs font-black flex items-center gap-1.5 ${
+              <div className={`p-2.5 rounded text-xs font-black flex items-center justify-between gap-1.5 ${
                 syncStatusMsg.type === 'success'
                   ? 'bg-green-500/20 text-green-200 border border-green-400/40'
+                  : syncStatusMsg.type === 'api_not_enabled'
+                  ? 'bg-amber-500/25 text-amber-200 border border-amber-300/40'
                   : 'bg-red-500/20 text-red-200 border border-red-400/40'
               }`}>
-                {syncStatusMsg.type === 'success' ? <Check className="w-4 h-4 shrink-0" /> : <AlertCircle className="w-4 h-4 shrink-0" />}
-                <span>{syncStatusMsg.text}</span>
+                <div className="flex items-center gap-1.5 flex-1">
+                  {syncStatusMsg.type === 'success' ? <Check className="w-4 h-4 shrink-0 text-green-300" /> : <AlertCircle className="w-4 h-4 shrink-0 text-amber-300" />}
+                  <span>{syncStatusMsg.text}</span>
+                </div>
+
+                {syncStatusMsg.type === 'api_not_enabled' && (
+                  <a
+                    href="https://console.cloud.google.com/apis/library/drive.googleapis.com"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="bg-amber-400 hover:bg-amber-300 text-[#161348] text-[10px] font-black px-2.5 py-1 rounded transition flex items-center gap-1 shrink-0 cursor-pointer shadow-xs"
+                  >
+                    <span>點我一鍵啟用 API</span>
+                    <ExternalLink className="w-3 h-3" />
+                  </a>
+                )}
               </div>
             )}
 
@@ -294,10 +314,18 @@ export default function SyncModal({ isOpen, onClose }) {
                   <div className="bg-amber-500/20 p-2 rounded border border-amber-300/30 text-[10px] text-amber-200 font-bold space-y-1">
                     <div className="flex items-center gap-1 text-white">
                       <HelpCircle className="w-3.5 h-3.5 text-amber-300 shrink-0" />
-                      <span>出現 403 access_denied 解決方法：</span>
+                      <span>重要提醒：需在 Google Console 點擊啟用「Google Drive API」</span>
                     </div>
-                    <p>
-                      前往 Google Console 的「OAuth 同意畫面」，點擊 <strong className="text-white">【發布應用程式 (Publish App)】</strong>，或者在「測試使用者」加入您的 Gmail 帳號即可！
+                    <p className="flex items-center justify-between gap-1">
+                      <span>並前往「OAuth 同意畫面」點擊【發布應用程式】即大功告成！</span>
+                      <a
+                        href="https://console.cloud.google.com/apis/library/drive.googleapis.com"
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-[#a1cdc4] hover:underline font-black text-[10px] shrink-0"
+                      >
+                        一鍵開啟 Drive API 頁面 ➔
+                      </a>
                     </p>
                   </div>
                 </div>

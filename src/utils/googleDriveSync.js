@@ -124,20 +124,31 @@ function getValidToken() {
 
 // 尋找 appDataFolder 中的備份檔案
 async function findBackupFile(token) {
-  const res = await fetch(
-    `https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&q=name='${BACKUP_FILENAME}'&fields=files(id,name,modifiedTime,size)`,
-    {
-      headers: { Authorization: `Bearer ${token}` }
+  try {
+    const res = await fetch(
+      `https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&q=name='${BACKUP_FILENAME}'&fields=files(id,name,modifiedTime,size)`,
+      {
+        headers: { Authorization: `Bearer ${token}` }
+      }
+    );
+    if (!res.ok) {
+      const errJson = await res.json().catch(() => ({}));
+      const errMsg = errJson?.error?.message || res.statusText || `HTTP ${res.status}`;
+      if (res.status === 403 || errMsg.includes('disabled') || errMsg.includes('not been used')) {
+        throw new Error('DRIVE_API_NOT_ENABLED');
+      }
+      throw new Error(`搜尋雲端備份檔失敗 (${res.status}): ${errMsg}`);
     }
-  );
-  if (!res.ok) {
-    throw new Error(`Find file failed: ${res.statusText}`);
+    const data = await res.json();
+    if (data.files && data.files.length > 0) {
+      return data.files[0];
+    }
+    return null;
+  } catch (err) {
+    if (err.message === 'DRIVE_API_NOT_ENABLED') throw err;
+    console.warn('findBackupFile notice:', err);
+    return null;
   }
-  const data = await res.json();
-  if (data.files && data.files.length > 0) {
-    return data.files[0];
-  }
-  return null;
 }
 
 // ⭐ 上傳 JSON 備份檔至 Google Drive 隱藏應用區 (appDataFolder) ⭐
@@ -175,8 +186,12 @@ export async function uploadToGoogleDrive(backupDataObj) {
   });
 
   if (!res.ok) {
-    const errText = await res.text();
-    throw new Error(`Upload failed: ${res.status} - ${errText}`);
+    const errJson = await res.json().catch(() => ({}));
+    const errMsg = errJson?.error?.message || res.statusText || `HTTP ${res.status}`;
+    if (res.status === 403 || errMsg.includes('disabled') || errMsg.includes('not been used')) {
+      throw new Error('DRIVE_API_NOT_ENABLED');
+    }
+    throw new Error(`雲端上傳失敗 (${res.status}): ${errMsg}`);
   }
 
   const resultFile = await res.json();
@@ -194,7 +209,7 @@ export async function downloadFromGoogleDrive() {
 
   const existingFile = await findBackupFile(token);
   if (!existingFile) {
-    throw new Error('雲端隱藏區中找不到 CollectTrack 的備份檔案！請先從另一台設備上傳備份。');
+    throw new Error('雲端隱藏區中尚無 CollectTrack 備份檔，請先在其他設備點擊【上傳最新數據到雲端】！');
   }
 
   const res = await fetch(`https://www.googleapis.com/drive/v3/files/${existingFile.id}?alt=media`, {
@@ -202,7 +217,7 @@ export async function downloadFromGoogleDrive() {
   });
 
   if (!res.ok) {
-    throw new Error(`Download failed: ${res.statusText}`);
+    throw new Error(`下載失敗 (${res.status}): ${res.statusText}`);
   }
 
   const backupDataObj = await res.json();
